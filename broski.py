@@ -193,6 +193,7 @@ def main(
             ]
         ):
             console.print(f"[green]Success[/green]")
+            return
 
         console.print(Panel(Syntax(result.script, "python"), title="Script"))
 
