@@ -6,6 +6,7 @@ import os
 import subprocess
 import tempfile
 from typing import Optional
+import platform
 
 import click
 from litellm import litellm
@@ -147,7 +148,7 @@ def main(
         memory=True,
         model=model,
     )
-    def invoke_llm(goal: str, last_terminal_output: str = "") -> ScriptResult:
+    def invoke_llm(goal: str, last_terminal_output: str = "", platform: str = platform.platform()) -> ScriptResult:
         """Create or modify a Python script based on the goal and previous output.
 
         If last_terminal_output is provided, analyze it for errors and make necessary corrections.
@@ -156,6 +157,7 @@ def main(
 
         Goal: '{goal}'
         Last Output: ```{last_terminal_output}```
+        Platform: {platform}
 
         If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
         If the goal was attained and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
