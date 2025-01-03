@@ -2,7 +2,7 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import tempfile
 import os
 import subprocess
@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Optional
 from promptic import llm
 from litellm import litellm
+from rich.live import Live
+from rich.status import Status
+from rich.text import Text
+import sys
+from threading import Thread
+from queue import Queue, Empty
 
 console = Console()
 
@@ -64,6 +70,13 @@ class ScriptResult(BaseModel):
     i_have_seen_the_last_terminal_output: bool = False
 
 
+def stream_output(process, output_queue):
+    """Stream output from a subprocess to a queue"""
+    for line in iter(process.stdout.readline, ""):
+        output_queue.put(line)
+    process.stdout.close()
+
+
 def run_script(script: str, verbose: bool) -> tuple[str, int]:
     """Run the given script using uv and return the output"""
     if verbose:
@@ -74,17 +87,50 @@ def run_script(script: str, verbose: bool) -> tuple[str, int]:
         f.write(script)
         script_path = f.name
 
+    output_lines = []
     try:
-        # Run script using uv
-        result = subprocess.run(
-            ["uv", "run", script_path], capture_output=True, text=True
-        )
-        output = result.stdout if result.returncode == 0 else f"Error:\n{result.stderr}"
+        with Status("[bold blue]Running script...", console=console) as status:
+            # Run script using uv with pipe for streaming
+            process = subprocess.Popen(
+                ["uv", "run", script_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
+            )
+
+            # Set up output streaming
+            output_queue = Queue()
+            output_thread = Thread(target=stream_output, args=(process, output_queue))
+            output_thread.daemon = True
+            output_thread.start()
+
+            # Display output in real-time
+            while True:
+                # Check if process has finished
+                if process.poll() is not None and output_queue.empty():
+                    break
+
+                # Get output from queue
+                try:
+                    line = output_queue.get_nowait()
+                    output_lines.append(line)
+                    status.update(
+                        f"[bold blue]Running script...\n[white]{line.strip()}"
+                    )
+                except Empty:
+                    continue
+
+            output_thread.join()
+            return_code = process.returncode
+
     finally:
         # Clean up temporary file
         os.unlink(script_path)
 
-    return output, result.returncode
+    output = "".join(output_lines)
+    return output, return_code
 
 
 @click.command()
@@ -95,8 +141,8 @@ def run_script(script: str, verbose: bool) -> tuple[str, int]:
 @click.option(
     "--control", "-c", is_flag=True, help="Prompt for permission before each execution"
 )
-@click.option("--model", "-m", default="gpt-4o", help="Specify the LLM model to use")
-@click.option("--api-key", help="API key for the LLM service")
+@click.option("--model", "-m", envvar="HOMES_MODEL", default="gpt-4o", help="Specify the LLM model to use")
+@click.option("--api-key", envvar="HOMES_API_KEY", help="API key for the LLM service")
 @click.option(
     "--max-iterations",
     "-i",
@@ -129,7 +175,7 @@ def main(
         Last Output: ```{last_terminal_output}```
 
         If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
-        If the goal was attained and you have seen the last terminal output, the message_to_user should be a summary of the terminal output.
+        If the goal was attained and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
         """
 
     if api_key:
@@ -145,12 +191,12 @@ def main(
     while iteration < max_iterations:
         iteration += 1
 
+        with Status("[bold yellow]Communicating with LLM...", console=console) as status:
+            result = invoke_llm(instruction_text, last_output)
+
         if iteration == max_iterations:
             console.print("[red]Maximum iterations reached without success[/red]")
             return
-
-        # Generate or update script
-        result = invoke_llm(instruction_text, last_output)
 
         # Check if task is complete
         if all(
@@ -168,8 +214,6 @@ def main(
                 console.print(last_output)
             break
 
-        
-
         if control:
             console.print(
                 Panel(Syntax(result.script, "python"), title="Proposed Script")
@@ -185,8 +229,6 @@ def main(
             console.print(Panel(last_output, title="Script Output"))
 
         console.print(Panel(result.message_to_user))
-
-        
 
 
 if __name__ == "__main__":
