@@ -5,8 +5,6 @@ warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:
 import os
 import subprocess
 import tempfile
-from queue import Empty, Queue
-from threading import Thread
 from typing import Optional
 
 import click
