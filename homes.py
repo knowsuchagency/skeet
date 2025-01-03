@@ -1,21 +1,27 @@
-import click
-from rich.console import Console
-from rich.panel import Panel
-from rich.syntax import Syntax
-from pydantic import BaseModel, ConfigDict
-import tempfile
+import warnings
+
+warnings.filterwarnings('ignore', message='Valid config keys have changed in V2:*')
+
 import os
 import subprocess
-from pathlib import Path
-from typing import Optional
-from promptic import llm
-from litellm import litellm
-from rich.live import Live
-from rich.status import Status
-from rich.text import Text
 import sys
+import tempfile
+import warnings
+from pathlib import Path
+from queue import Empty, Queue
 from threading import Thread
-from queue import Queue, Empty
+from typing import Optional
+
+import click
+from litellm import litellm
+from promptic import llm
+from pydantic import BaseModel, ConfigDict
+from rich.console import Console
+from rich.live import Live
+from rich.panel import Panel
+from rich.status import Status
+from rich.syntax import Syntax
+from rich.text import Text
 
 console = Console()
 
@@ -29,6 +35,7 @@ Key guidelines:
 - Include detailed error handling and user feedback
 - Scripts should be self-contained and handle their own dependencies via uv
 - All scripts should include proper uv script metadata headers with dependencies
+- The script should be written such that if it returns with a zero exit code, a descriptive message is printed to stdout with the relevant information.
 
 Important uv script format:
 Scripts must start with metadata in TOML format:
@@ -141,7 +148,13 @@ def run_script(script: str, verbose: bool) -> tuple[str, int]:
 @click.option(
     "--control", "-c", is_flag=True, help="Prompt for permission before each execution"
 )
-@click.option("--model", "-m", envvar="HOMES_MODEL", default="gpt-4o", help="Specify the LLM model to use")
+@click.option(
+    "--model",
+    "-m",
+    envvar="HOMES_MODEL",
+    default="gpt-4o",
+    help="Specify the LLM model to use",
+)
 @click.option("--api-key", envvar="HOMES_API_KEY", help="API key for the LLM service")
 @click.option(
     "--max-iterations",
@@ -203,7 +216,7 @@ def main(
         if iteration == max_iterations:
             console.print("[red]Maximum iterations reached without success[/red]")
             return
-        
+
         if not check and return_code == 0:
             console.print(f"[green]Success[/green]")
             return
@@ -223,9 +236,9 @@ def main(
             console.print(
                 Panel(Syntax(result.script, "python"), title="Proposed Script")
             )
-        
+
         if control:
-            
+
             if not click.confirm("Execute this script?"):
                 console.print("Execution cancelled")
                 return
@@ -236,8 +249,6 @@ def main(
         console.print(Panel(result.message_to_user, title="Message to User"))
 
         console.print(Panel(last_output, title="Script Output"))
-
-        
 
 
 if __name__ == "__main__":
