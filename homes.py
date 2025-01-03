@@ -190,7 +190,6 @@ def main(
     if api_key:
         litellm.api_key = api_key
 
-    # Join instructions into a single string
     instruction_text = " ".join(instructions)
 
     last_output = None
@@ -211,7 +210,6 @@ def main(
             console.print("[red]Maximum iterations reached without success[/red]")
             return
 
-        # Check if task is complete
         if all(
             [
                 result.i_have_seen_the_last_terminal_output,
@@ -232,7 +230,6 @@ def main(
                 console.print("Execution cancelled")
                 return
 
-        # Run the script
         last_output, return_code = run_script(result.script)
 
         console.print(Panel(result.message_to_user, title="Message to User"))
