@@ -127,7 +127,7 @@ def run_script(script: str) -> tuple[str, int]:
 @click.option(
     "--check",
     is_flag=True,
-    help="If true, the llm will check the output of the script and determine if the goal was met. Else, the program will terminate if the script doesn't return a 0 exit code.",
+    help="If true, the llm will check the output of the script and determine if the goal was met. Else, the program will terminate if the script returns a zero exit code.",
 )
 def main(
     instructions: tuple,
