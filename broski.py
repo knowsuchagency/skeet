@@ -98,10 +98,6 @@ def run_script(script: str) -> tuple[str, int]:
                 check=False,
             )
 
-            # Update status with output
-            if process.stdout:
-                status.update(f"[bold blue]Running script...\n[white]{process.stdout}")
-
             return process.stdout or "", process.returncode
 
     finally:
@@ -148,7 +144,9 @@ def main(
         memory=True,
         model=model,
     )
-    def invoke_llm(goal: str, last_terminal_output: str = "", platform: str = platform.platform()) -> ScriptResult:
+    def invoke_llm(
+        goal: str, last_terminal_output: str = "", platform: str = platform.platform()
+    ) -> ScriptResult:
         """Create or modify a Python script based on the goal and previous output.
 
         If last_terminal_output is provided, analyze it for errors and make necessary corrections.
@@ -199,7 +197,6 @@ def main(
         console.print(Panel(Syntax(result.script, "python"), title="Script"))
 
         if control:
-
             if not click.confirm("Execute this script?"):
                 console.print("Execution cancelled")
                 return
