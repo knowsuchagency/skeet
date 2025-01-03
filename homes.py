@@ -1,13 +1,10 @@
 import warnings
 
-warnings.filterwarnings('ignore', message='Valid config keys have changed in V2:*')
+warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:*")
 
 import os
 import subprocess
-import sys
 import tempfile
-import warnings
-from pathlib import Path
 from queue import Empty, Queue
 from threading import Thread
 from typing import Optional
@@ -15,13 +12,11 @@ from typing import Optional
 import click
 from litellm import litellm
 from promptic import llm
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from rich.console import Console
-from rich.live import Live
 from rich.panel import Panel
 from rich.status import Status
 from rich.syntax import Syntax
-from rich.text import Text
 
 console = Console()
 
@@ -35,7 +30,8 @@ Key guidelines:
 - Include detailed error handling and user feedback
 - Scripts should be self-contained and handle their own dependencies via uv
 - All scripts should include proper uv script metadata headers with dependencies
-- The script should be written such that if it returns with a zero exit code, a descriptive message is printed to stdout with the relevant information.
+- The script should be written such that it only succeeds if it achieves the goal or answers the user's query. Otherwise, it should fail.
+- If successful, the script should print a message to stdout with all relevant information.
 
 Important uv script format:
 Scripts must start with metadata in TOML format:
@@ -84,10 +80,8 @@ def stream_output(process, output_queue):
     process.stdout.close()
 
 
-def run_script(script: str, verbose: bool) -> tuple[str, int]:
+def run_script(script: str) -> tuple[str, int]:
     """Run the given script using uv and return the output"""
-    if verbose:
-        console.print(Panel(Syntax(script, "python"), title="Executing Script"))
 
     # Create temporary script file
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
@@ -143,9 +137,6 @@ def run_script(script: str, verbose: bool) -> tuple[str, int]:
 @click.command()
 @click.argument("instructions", nargs=-1, required=True)
 @click.option(
-    "--verbose", "-v", is_flag=True, help="Show detailed execution information"
-)
-@click.option(
     "--control", "-c", is_flag=True, help="Prompt for permission before each execution"
 )
 @click.option(
@@ -169,7 +160,6 @@ def run_script(script: str, verbose: bool) -> tuple[str, int]:
 )
 def main(
     instructions: tuple,
-    verbose: bool,
     control: bool,
     model: Optional[str],
     api_key: Optional[str],
@@ -210,15 +200,15 @@ def main(
     while iteration < max_iterations:
         iteration += 1
 
+        if return_code == 0 and not check:
+            console.print(f"[green]Success[/green]")
+            return
+
         with Status("[bold yellow]Communicating with LLM...", console=console):
             result = invoke_llm(instruction_text, last_output)
 
         if iteration == max_iterations:
             console.print("[red]Maximum iterations reached without success[/red]")
-            return
-
-        if not check and return_code == 0:
-            console.print(f"[green]Success[/green]")
             return
 
         # Check if task is complete
@@ -232,9 +222,8 @@ def main(
         ):
             console.print(f"[green]Success[/green]")
 
-        if verbose or control:
-            console.print(
-                Panel(Syntax(result.script, "python"), title="Proposed Script")
+        console.print(
+                Panel(Syntax(result.script, "python"), title="Script")
             )
 
         if control:
@@ -244,7 +233,7 @@ def main(
                 return
 
         # Run the script
-        last_output, return_code = run_script(result.script, verbose)
+        last_output, return_code = run_script(result.script)
 
         console.print(Panel(result.message_to_user, title="Message to User"))
 
