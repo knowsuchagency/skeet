@@ -113,7 +113,7 @@ def run_script(script: str) -> tuple[str, int]:
 @click.option(
     "--model",
     "-m",
-    envvar="HOMES_MODEL",
+    envvar="BROSKI_MODEL",
     default="gpt-4o",
     help="Specify the LLM model to use",
 )
