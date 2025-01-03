@@ -191,7 +191,7 @@ def main(
     while iteration < max_iterations:
         iteration += 1
 
-        with Status("[bold yellow]Communicating with LLM...", console=console) as status:
+        with Status("[bold yellow]Communicating with LLM...", console=console):
             result = invoke_llm(instruction_text, last_output)
 
         if iteration == max_iterations:
@@ -214,10 +214,13 @@ def main(
                 console.print(last_output)
             break
 
-        if control:
+        if verbose or control:
             console.print(
                 Panel(Syntax(result.script, "python"), title="Proposed Script")
             )
+        
+        if control:
+            
             if not click.confirm("Execute this script?"):
                 console.print("Execution cancelled")
                 return
@@ -225,8 +228,7 @@ def main(
         # Run the script
         last_output, return_code = run_script(result.script, verbose)
 
-        if verbose:
-            console.print(Panel(last_output, title="Script Output"))
+        console.print(Panel(last_output, title="Script Output"))
 
         console.print(Panel(result.message_to_user))
 
