@@ -149,6 +149,11 @@ def run_script(script: str, verbose: bool) -> tuple[str, int]:
     default=5,
     help="Maximum number of script generation iterations",
 )
+@click.option(
+    "--check",
+    is_flag=True,
+    help="If true, the llm will check the output of the script and determine if the goal was met. Else, the program will terminate if the script doesn't return a 0 exit code.",
+)
 def main(
     instructions: tuple,
     verbose: bool,
@@ -156,6 +161,7 @@ def main(
     model: Optional[str],
     api_key: Optional[str],
     max_iterations: int,
+    check: bool,
 ):
     """Generate and run Python scripts based on natural language instructions"""
 
@@ -197,6 +203,10 @@ def main(
         if iteration == max_iterations:
             console.print("[red]Maximum iterations reached without success[/red]")
             return
+        
+        if not check and return_code == 0:
+            console.print(f"[green]Success[/green]")
+            return
 
         # Check if task is complete
         if all(
@@ -207,12 +217,7 @@ def main(
                 return_code == 0,
             ]
         ):
-            if verbose:
-                console.print(f"[green]Success[/green]")
-                print(result.message_to_user)
-            else:
-                console.print(last_output)
-            break
+            console.print(f"[green]Success[/green]")
 
         if verbose or control:
             console.print(
@@ -228,9 +233,11 @@ def main(
         # Run the script
         last_output, return_code = run_script(result.script, verbose)
 
+        console.print(Panel(result.message_to_user, title="Message to User"))
+
         console.print(Panel(last_output, title="Script Output"))
 
-        console.print(Panel(result.message_to_user))
+        
 
 
 if __name__ == "__main__":
