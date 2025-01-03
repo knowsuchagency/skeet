@@ -88,50 +88,26 @@ def run_script(script: str) -> tuple[str, int]:
         f.write(script)
         script_path = f.name
 
-    output_lines = []
     try:
         with Status("[bold blue]Running script...", console=console) as status:
-            # Run script using uv with pipe for streaming
-            process = subprocess.Popen(
+            # Run script using uv and capture output
+            process = subprocess.run(
                 ["uv", "run", script_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                bufsize=1,
-                universal_newlines=True,
+                check=False,
             )
 
-            # Set up output streaming
-            output_queue = Queue()
-            output_thread = Thread(target=stream_output, args=(process, output_queue))
-            output_thread.daemon = True
-            output_thread.start()
+            # Update status with output
+            if process.stdout:
+                status.update(f"[bold blue]Running script...\n[white]{process.stdout}")
 
-            # Display output in real-time
-            while True:
-                # Check if process has finished
-                if process.poll() is not None and output_queue.empty():
-                    break
-
-                # Get output from queue
-                try:
-                    line = output_queue.get_nowait()
-                    output_lines.append(line)
-                    status.update(
-                        f"[bold blue]Running script...\n[white]{line.strip()}"
-                    )
-                except Empty:
-                    continue
-
-            output_thread.join()
-            return_code = process.returncode
+            return process.stdout or "", process.returncode
 
     finally:
         # Clean up temporary file
         os.unlink(script_path)
-
-    output = "".join(output_lines)
-    return output, return_code
 
 
 @click.command()
@@ -220,9 +196,7 @@ def main(
         ):
             console.print(f"[green]Success[/green]")
 
-        console.print(
-                Panel(Syntax(result.script, "python"), title="Script")
-            )
+        console.print(Panel(Syntax(result.script, "python"), title="Script"))
 
         if control:
 
