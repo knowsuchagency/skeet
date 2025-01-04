@@ -19,6 +19,8 @@ from rich.status import Status
 from rich.syntax import Syntax
 from ruamel.yaml import YAML
 
+__version__ = "0.5.5"
+
 
 SYSTEM_PROMPT = """
 You are an expert Python developer tasked with writing scripts to fulfill user instructions.
@@ -166,6 +168,8 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
     is_flag=True,
     help="If true, the program will clean up the temporary file after running the script.",
 )
+@click.option("--upgrade", "-u", is_flag=True, help="Upgrade Skeet to the latest version with uv.")
+@click.version_option(version=__version__)
 def main(
     instructions: tuple,
     control: bool,
@@ -175,10 +179,16 @@ def main(
     ensure: bool,
     no_loop: bool,
     cleanup: bool,
+    upgrade: bool,
 ):
     """Describe what you want done, and Skeet will use AI to make it happen."""
 
     assert attempts != 0, "Attempts must be greater or less than 0"
+
+    if upgrade:
+        with Status("[bold yellow]Upgrading Skeet...", console=console):
+            subprocess.run("uv tool install -P skeet skeet", shell=True)
+        return
 
     @llm(
         system=SYSTEM_PROMPT,
