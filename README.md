@@ -1,6 +1,8 @@
 # Skeet
 
-Skeet is a command-line tool that generates and executes Python scripts using natural language instructions through LLM integration. It allows you to describe what you want to accomplish, and Skeet will create and run the appropriate Python script.
+Describe what you want done in your terminal, and *Skeet* will use AI to make it happen. 
+
+Skeet works by leveraging [promptic](https://github.com/knowsuchagency/promptic) to generate Python scripts and `uv` to run them. By leveraging [uv scripts](https://docs.astral.sh/uv/guides/scripts/), Skeet can can execute Python scripts that have dependencies on third-party libraries without needing virtual environments.
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/aaeddf6d-e9a0-4629-8a28-ef462029fba3" width="300" alt="logo">
@@ -10,9 +12,10 @@ Skeet is a command-line tool that generates and executes Python scripts using na
 ## Examples
 
 ```bash
-skeet list all python files here
 
 skeet show me system information about this computer
+
+skeet convert all the html files in the current directory to pdf and save them to `~/Downloads/`
 
 skeet what is using port 8000
 

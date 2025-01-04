@@ -5,11 +5,15 @@ dependencies = [
   "rich>=13.9.4",
   "ruamel-yaml>=0.18.8",
 ]
-description = "Add your description here"
+description = "Describe what you want done in your terminal, and Skeet will use AI to make it happen."
 name = "skeet"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
-version = "1.0.0"
+version = "0.5.0"
+
+[project.urls]
+"Source" = "https://github.com/knowsuchagency/skeet"
 
 [project.scripts]
 skeet = "skeet:main"
