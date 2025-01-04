@@ -24,7 +24,7 @@ skeet "what's the total size of ~/Downloads?"
 
 ## Installation
 
-The recommended installation method is using [uv](https://github.com/astral-sh/uv).
+The recommended installation method is [uv](https://github.com/astral-sh/uv).
 
 ```bash
 uv tool install skeet
