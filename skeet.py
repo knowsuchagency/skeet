@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 from typing import Optional
 import platform
+from pathlib import Path
 
 import click
 from litellm import litellm
@@ -16,8 +17,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.status import Status
 from rich.syntax import Syntax
+from ruamel.yaml import YAML
 
-console = Console()
 
 SYSTEM_PROMPT = """
 You are an expert Python developer tasked with writing scripts to fulfill user instructions.
@@ -26,8 +27,8 @@ Your scripts should be concise, use modern Python idioms, and leverage appropria
 Key guidelines:
 - Return complete, runnable Python scripts that use the necessary imports
 - Prefer standard library solutions when appropriate
-- Include detailed error handling and user feedback
 - Scripts should be self-contained and handle their own dependencies via uv
+- Script should be as concise as possible while maintaining legibility
 - All scripts should include proper uv script metadata headers with dependencies
 - The script should be written such that it only succeeds if it achieves the goal or answers the user's query. Otherwise, it should fail.
 - If successful, the script should print a message to stdout with all relevant information.
@@ -62,6 +63,17 @@ Remember to handle common scenarios like:
 Focus on writing reliable, production-quality code that solves the user's needs efficiently.
 """
 
+console = Console()
+
+yaml = YAML()
+
+config_path = Path.home() / ".config" / "skeet" / "config.yaml"
+
+if config_path.exists():
+    config = yaml.load(config_path)
+else:
+    config = {}
+
 
 class ScriptResult(BaseModel):
     """Model for LLM response structure"""
@@ -79,10 +91,9 @@ def stream_output(process, output_queue):
     process.stdout.close()
 
 
-def run_script(script: str) -> tuple[str, int]:
+def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
     """Run the given script using uv and return the output"""
 
-    # Create temporary script file
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(script)
         script_path = f.name
@@ -91,53 +102,84 @@ def run_script(script: str) -> tuple[str, int]:
         with Status("[bold blue]Running script...", console=console) as status:
             # Run script using uv and capture output
             process = subprocess.run(
-                ["uv", "run", script_path],
+                ["uv", "run", "-q", script_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 check=False,
             )
 
-            return process.stdout or "", process.returncode
+            return process.stdout.strip() or "", process.returncode, script_path
 
     finally:
-        # Clean up temporary file
-        os.unlink(script_path)
+        if cleanup:
+            # Clean up temporary file
+            os.unlink(script_path)
 
 
 @click.command()
 @click.argument("instructions", nargs=-1, required=True)
 @click.option(
-    "--control", "-c", is_flag=True, help="Prompt for permission before each execution"
+    "--control",
+    "-c",
+    is_flag=True,
+    default=config.get("control", False),
+    help="Prompt for permission before each execution",
 )
 @click.option(
     "--model",
     "-m",
-    envvar="BROSKI_MODEL",
-    default="gpt-4o",
+    envvar="SKEET_MODEL",
+    default=config.get("model", "gpt-4o"),
     help="Specify the LLM model to use",
 )
-@click.option("--api-key", envvar="HOMES_API_KEY", help="API key for the LLM service")
 @click.option(
-    "--max-iterations",
-    "-i",
-    default=5,
-    help="Maximum number of script generation iterations",
+    "--api-key",
+    "-k",
+    envvar="SKEET_API_KEY",
+    default=config.get("api_key", None),
+    help="API key for the LLM service",
 )
 @click.option(
-    "--check",
+    "--attempts",
+    "-a",
+    envvar="SKEET_ATTEMPTS",
+    default=config.get("attempts", 5),
+    help="Maximum number of script execution attempts. If less than 0, the program will loop until the script is successful, regardless of errors.",
+)
+@click.option(
+    "--ensure",
+    "-e",
     is_flag=True,
-    help="If true, the llm will check the output of the script and determine if the goal was met. Else, the program will terminate if the script returns a zero exit code.",
+    default=config.get("ensure", False),
+    help="If true, the llm will check the output of the script and determine if the goal was met. By default, the program will terminate if the script returns a zero exit code.",
+)
+@click.option(
+    "--no-loop",
+    "-n",
+    is_flag=True,
+    default=config.get("no_loop", False),
+    help="If true, the program will not loop and will only run once. By default, the program will keep running until the instructions are satisfied.",
+)
+@click.option(
+    "--cleanup",
+    "-x",
+    is_flag=True,
+    help="If true, the program will clean up the temporary file after running the script.",
 )
 def main(
     instructions: tuple,
     control: bool,
     model: Optional[str],
     api_key: Optional[str],
-    max_iterations: int,
-    check: bool,
+    attempts: int,
+    ensure: bool,
+    no_loop: bool,
+    cleanup: bool,
 ):
     """Generate and run Python scripts based on natural language instructions"""
+
+    assert attempts != 0, "Attempts must be greater or less than 0"
 
     @llm(
         system=SYSTEM_PROMPT,
@@ -145,7 +187,9 @@ def main(
         model=model,
     )
     def invoke_llm(
-        goal: str, last_terminal_output: str = "", platform: str = platform.platform()
+        goal: str,
+        last_terminal_output: str = "",
+        platform: str = platform.platform(),
     ) -> ScriptResult:
         """Create or modify a Python script based on the goal and previous output.
 
@@ -170,17 +214,16 @@ def main(
     iteration = 0
     return_code = -1
 
-    while iteration < max_iterations:
+    while attempts < 0 or iteration < attempts:
         iteration += 1
 
-        if return_code == 0 and not check:
-            console.print(f"[green]Success[/green]")
+        if return_code == 0 and not ensure:
             return
 
         with Status("[bold yellow]Communicating with LLM...", console=console):
             result = invoke_llm(instruction_text, last_output)
 
-        if iteration == max_iterations:
+        if iteration == attempts:
             console.print("[red]Maximum iterations reached without success[/red]")
             return
 
@@ -192,21 +235,35 @@ def main(
                 return_code == 0,
             ]
         ):
-            console.print(f"[green]Success[/green]")
             return
 
         console.print(Panel(Syntax(result.script, "python"), title="Script"))
 
         if control:
-            if not click.confirm("Execute this script?"):
-                console.print("Execution cancelled")
-                return
+            changes = click.prompt(
+                "What changes would you like to make to the script? Hit Enter to run without changes.",
+                type=str,
+                default="",
+            )
+            if changes:
+                instruction_text = changes
+                continue
 
-        last_output, return_code = run_script(result.script)
+        last_output, return_code, script_path = run_script(result.script, cleanup)
 
-        console.print(Panel(result.message_to_user, title="Message to User"))
+        console.print(Panel(result.message_to_user, title="LLM"))
 
-        console.print(Panel(last_output, title="Script Output"))
+        console.print(
+            Panel(
+                last_output,
+                title="Script Output",
+                subtitle=script_path if not cleanup else "",
+                border_style="green" if return_code == 0 else "red",
+            )
+        )
+
+        if no_loop:
+            break
 
 
 if __name__ == "__main__":
