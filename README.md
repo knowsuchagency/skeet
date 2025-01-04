@@ -1,10 +1,11 @@
 # Skeet
 
+Skeet is a command-line tool that generates and executes Python scripts using natural language instructions through LLM integration. It allows you to describe what you want to accomplish, and Skeet will create and run the appropriate Python script.
+
 <p align="center">
   <img src="https://github.com/user-attachments/assets/aaeddf6d-e9a0-4629-8a28-ef462029fba3" width="300" alt="logo">
 </p>
 
-Skeet is a command-line tool that generates and executes Python scripts using natural language instructions through LLM integration. It allows you to describe what you want to accomplish, and Skeet will create and run the appropriate Python script.
 
 ## Examples
 
