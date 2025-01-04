@@ -19,7 +19,7 @@ from rich.status import Status
 from rich.syntax import Syntax
 from ruamel.yaml import YAML
 
-__version__ = "0.5.5"
+__version__ = "0.6.0"
 
 
 SYSTEM_PROMPT = """
@@ -120,7 +120,7 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
 
 
 @click.command()
-@click.argument("instructions", nargs=-1, required=True)
+@click.argument("instructions", nargs=-1, required=False)
 @click.option(
     "--control",
     "-c",
@@ -168,7 +168,9 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
     is_flag=True,
     help="If true, the program will clean up the temporary file after running the script.",
 )
-@click.option("--upgrade", "-u", is_flag=True, help="Upgrade Skeet to the latest version with uv.")
+@click.option(
+    "--upgrade", "-U", is_flag=True, help="Upgrade Skeet to the latest version with uv."
+)
 @click.version_option(version=__version__)
 def main(
     instructions: tuple,
@@ -189,6 +191,11 @@ def main(
         with Status("[bold yellow]Upgrading Skeet...", console=console):
             subprocess.run("uv tool install -P skeet skeet", shell=True)
         return
+
+    if not instructions:
+        ctx = click.get_current_context()
+        click.echo(ctx.get_help())
+        ctx.exit()
 
     @llm(
         system=SYSTEM_PROMPT,
