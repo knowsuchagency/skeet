@@ -143,7 +143,6 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
 @click.option(
     "--attempts",
     "-a",
-    envvar="SKEET_ATTEMPTS",
     default=config.get("attempts", 5),
     help="Maximum number of script execution attempts. If less than 0, the program will loop until the script is successful, regardless of errors.",
 )
