@@ -176,7 +176,7 @@ def main(
     no_loop: bool,
     cleanup: bool,
 ):
-    """Generate and run Python scripts based on natural language instructions"""
+    """Describe what you want done, and Skeet will use AI to make it happen."""
 
     assert attempts != 0, "Attempts must be greater or less than 0"
 
