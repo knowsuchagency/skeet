@@ -15,11 +15,11 @@ Skeet works by leveraging [promptic](https://github.com/knowsuchagency/promptic)
 
 skeet show me system information about this computer
 
-skeet convert all the html files in the current directory to pdf and save them to `~/Downloads/`
+skeet convert all the html files in the current directory to pdf
 
 skeet what is using port 8000
 
-skeet "what's the total size of the current directory?"
+skeet "what's the total size of ~/Downloads?"
 ```
 
 ## Installation
