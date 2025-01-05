@@ -65,7 +65,7 @@ skeet -n anthropic "what's the weather like?"
 skeet --namespace openai "list files in the current directory"
 ```
 
-If no namespace is specified, the `default` configuration will be used.
+If no namespace is specified, the `default` one will be used.
 
 ## How it Works
 
