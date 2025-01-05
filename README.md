@@ -59,7 +59,7 @@ openai: # OpenAI-specific configuration
   api_key: "sk-..."
 
 anthropic: # Anthropic-specific configuration
-  model: "claude-3-sonnet"
+  model: "claude-3-5-sonnet-20240620"
   api_key: "sk-..."
 
 ollama: # Local Ollama configuration
