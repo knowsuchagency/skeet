@@ -35,7 +35,7 @@ Skeet can be configured using a YAML file at `~/.config/skeet/config.yaml`.
 
 You can support multiple LLM providers by adding a namespace to your config. 
 
-**NOTE:** You must use a `default` namespace.
+**NOTE:** You must have a `default` namespace.
 
 There aren't any keys that are required for a given namespace, but model and api_key are recommended.
 
