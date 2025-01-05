@@ -8,10 +8,7 @@ _Skeet_ generates Python scripts using [promptic](https://github.com/knowsuchage
 
 ## Examples
 
-[![asciicast](https://asciinema.org/a/697025.svg)](https://asciinema.org/a/697025)
-
 ```bash
-
 skeet show me system information about this computer
 
 skeet convert all the html files in the current directory to pdf
@@ -20,6 +17,9 @@ skeet what is using port 8000
 
 skeet "what's the total size of ~/Downloads?"
 ```
+
+[![asciicast](https://asciinema.org/a/697025.svg)](https://asciinema.org/a/697025)
+
 
 ## Installation
 
