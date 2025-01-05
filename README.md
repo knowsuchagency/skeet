@@ -22,6 +22,10 @@ skeet --python convert all html files in the current directory to pdf
 skeet -p "how many stars for https://github.com/knowsuchagency/promptic?"
 ```
 
+### Demo
+
+[![asciicast](https://asciinema.org/a/697033.svg)](https://asciinema.org/a/697033)
+
 ## Installation
 
 The recommended installation method is [uv](https://github.com/astral-sh/uv).
@@ -29,10 +33,6 @@ The recommended installation method is [uv](https://github.com/astral-sh/uv).
 ```bash
 uv tool install skeet
 ```
-
-## Demo
-
-[![asciicast](https://asciinema.org/a/697032.svg)](https://asciinema.org/a/697032)
 
 ## Configuration
 
