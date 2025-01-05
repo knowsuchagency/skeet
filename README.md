@@ -13,9 +13,8 @@ _Skeet_ supports any LLM provider available through [LiteLLM](https://docs.litel
 ```bash
 # Shell commands (default)
 skeet show me system information about this computer
-skeet list all pdf files recursively
 skeet what is using port 8000
-skeet "what's the total size of ~/Downloads?"
+skeet "what's size of my downloads folder?"
 
 # Python scripts (using -p or --python flag)
 skeet --python convert all html files in the current directory to pdf
