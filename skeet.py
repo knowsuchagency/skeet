@@ -44,6 +44,7 @@ Focus on:
 - Platform-specific considerations (Windows vs Unix)
 - Proper error handling and user feedback
 - Security best practices
+- You cannot use `sudo`
 """
 
 PYTHON_SYSTEM_PROMPT = """
@@ -113,7 +114,7 @@ class ScriptResult(BaseModel):
 class CommandResult(BaseModel):
     """Model for LLM response structure"""
 
-    terminal_command: str
+    terminal_command_or_shell_script: str
     message_to_user: str
     the_goal_was_attained: bool = False
     i_have_seen_the_last_terminal_output: bool = False
@@ -349,7 +350,9 @@ def main(
         shell: str = get_shell_info(),
     ):
         """
-        Create or modify an appropriate terminal command based on the goal, previous output, platform, and shell.
+        Create or modify an appropriate terminal command or shell script based on the goal, previous output, platform, and shell.
+
+        If the goal is to be satisfied, the terminal command or shell script must return a zero exit code. For example, if the goal is 'what is using port 8000', account for when the port is not being used like so: 'lsof -i :8000 || echo "port 8000 is not being used"'
 
         Do not include exposition or commentary.
 
@@ -429,11 +432,13 @@ def main(
         if return_code == 0 and not ensure:
             return
 
-        def execute_llm(mode: Literal["python", "command"]) -> dict | str:
+        def execute_llm(mode: Literal["python", "command"], instruction_text=instruction_text) -> dict | str:
             if mode == "python":
                 invocation = get_or_analyze_python_script(instruction_text, last_output)
             else:
-                invocation = get_or_analyze_command(instruction_text, last_output)
+                invocation = get_or_analyze_command(
+                    instruction_text if "sudo" not in instruction_text else "YOU CANNOT USE SUDO",
+                    last_output)
 
             if synchronous:
                 return invocation
@@ -497,7 +502,7 @@ def main(
                     terminal_command = result_string
 
                 result = CommandResult(
-                    terminal_command=terminal_command,
+                    terminal_command_or_shell_script=terminal_command,
                     message_to_user="",
                     the_goal_was_attained=False,
                     i_have_seen_the_last_terminal_output=False,
@@ -533,7 +538,7 @@ def main(
             if python:
                 console.print(Panel(Syntax(result.script, "python"), title="Script"))
             else:
-                console.print(Panel(Syntax(result.terminal_command, get_shell_info()), title="Command"))
+                console.print(Panel(Syntax(result.terminal_command_or_shell_script, get_shell_info()), title="Command"))
 
         if confirm:
             changes = click.prompt(
@@ -551,7 +556,7 @@ def main(
                 result.script, cleanup, verbose
             )
         else:
-            last_output, return_code = run_command(result.terminal_command, verbose)
+            last_output, return_code = run_command(result.terminal_command_or_shell_script, verbose)
 
         if result.message_to_user and synchronous:
             console.print(Panel(result.message_to_user, title="LLM"))
