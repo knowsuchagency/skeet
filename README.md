@@ -1,16 +1,19 @@
 
 <h3 align="center">
-🧙‍♂️ <i>Skeet</i> - Master your machine: If you know English, <i>Skeet</i> makes you a command-line wizard.
-</h3>
+🧞 <i>Skeet</i> - <i>Skeet</i> is like a genie that lives in your terminal. Tell it what you want, and <i>Skeet</i> makes your wishes come true. 💫
+</h3> 
 
-![skeet](https://github.com/user-attachments/assets/0d0e153e-fb64-47f4-908b-ac0388206c38)
+![skeet](https://github.com/user-attachments/assets/e4253aa6-3069-47bf-a7be-7da5bcf79413)
 
+
+🔥 Think of _Skeet_ as [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) on steroids. It won't give up on the first try and works with practically any LLM provider, putting you in full control of your terminal.
 
 🎯 Like a skilled marksman who keeps shooting until they hit their target, _Skeet_ transforms your natural language instructions into precise shell commands or Python scripts, adapting and retrying automatically until the job is done.
 
 🤖 Built on [promptic](https://github.com/knowsuchagency/promptic) and powered by [uv](https://github.com/astral-sh/uv), _Skeet_ can execute Python scripts with access to third-party libraries—no virtual environments needed. When a command fails, _Skeet_ analyzes the output and adjusts its approach, ensuring your goals are met.
 
 ⭐ _Skeet_ supports any LLM provider available through [LiteLLM](https://docs.litellm.ai/docs/providers), including OpenAI, Anthropic, Azure, local models, and many more!
+
 
 ## Installation
 
@@ -47,7 +50,7 @@ There aren't any keys that are required for a given namespace, but `model` and `
 default: # Default namespace
   model: "gpt-4o" # Default LLM model to use
   api_key: "sk-..." # Your LLM API key
-  interactive: false # Confirm each command and suggest changes
+  yolo: false # Automatically execute scripts and commands without asking for confirmation
   attempts: 5 # Maximum number of execution attempts
   verify: false # Whether to verify output with LLM
   cleanup: false # Whether to clean up temporary files
@@ -75,6 +78,15 @@ skeet --namespace ollama "list files in the current directory"
 
 If no namespace is specified, the `default` one will be used.
 
+
+## Features
+
+- ⚙️ Works with any LLM provider supported by [LiteLLM](https://docs.litellm.ai/docs/providers)
+- 🔄 Automatically alter commands and scripts based on the error output and retry
+- 💬 Natural language to shell command or Python script conversion
+- 🐍 Python script execution with automatic dependency management using `uv`
+- 💻 Rich terminal output with syntax highlighting
+
 ## How it Works
 
 1. You provide natural language instructions
@@ -85,14 +97,4 @@ If no namespace is specified, the `default` one will be used.
 4. Skeet executes the command or script
 5. If the execution fails or doesn't achieve the goal, Skeet can retry with improvements based on the error output
 
-## Features
-
-- Natural language to shell command or Python script conversion
-- Shell command execution for common tasks
-- Python script execution with automatic dependency management using `uv`
-- Interactive mode for command/script approval
-- Error handling and automatic retry
-- Configurable LLM models
-- Rich terminal output with syntax highlighting
-
-[![asciicast](https://asciinema.org/a/697033.svg)](https://asciinema.org/a/697033)
+[![asciicast](https://asciinema.org/a/697092.svg)](https://asciinema.org/a/697092)

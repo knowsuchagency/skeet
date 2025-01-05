@@ -1,4 +1,3 @@
-from typing_extensions import Literal
 import warnings
 
 warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:*")
@@ -20,6 +19,7 @@ from rich.panel import Panel
 from rich.status import Status
 from rich.pretty import pprint
 from rich.syntax import Syntax
+from rich.prompt import Prompt
 from ruamel.yaml import YAML
 
 __version__ = "1.0.0"
@@ -27,7 +27,7 @@ __version__ = "1.0.0"
 DEFAULT_VALUES = {
     "model": "gpt-4o",
     "api_key": None,
-    "interactive": False,
+    "yolo": False,
     "attempts": 5,
     "verify": False,
     "cleanup": False,
@@ -102,22 +102,22 @@ else:
     configurations = {}
 
 
-class ScriptResult(BaseModel):
+class Result(BaseModel):
     """Model for LLM response structure"""
 
-    script: str
+    command_or_script: str
     message_to_user: str
     the_query_was_satisfied: bool = False
     i_have_seen_the_last_terminal_output: bool = False
 
-
-class CommandResult(BaseModel):
-    """Model for LLM response structure"""
-
-    terminal_command_or_shell_script: str
-    message_to_user: str
-    the_query_was_satisfied: bool = False
-    i_have_seen_the_last_terminal_output: bool = False
+    def __init__(self, **data):
+        # Clean up any backticks from command_or_script before initialization
+        # Deepseek occasionally adds them for some reason
+        if "command_or_script" in data:
+            data["command_or_script"] = (
+                data["command_or_script"].replace("```", "").strip().strip("`")
+            )
+        super().__init__(**data)
 
 
 def stream_output(process, output_queue):
@@ -208,10 +208,10 @@ def get_shell_info():
 @click.command()
 @click.argument("query", nargs=-1, required=False)
 @click.option(
-    "--interactive",
-    "-i",
+    "--yolo",
+    "-y",
     is_flag=True,
-    help="Interactive mode. Confirm each command and suggest changes.",
+    help="Automatically execute scripts and commands without asking for confirmation.",
 )
 @click.option(
     "--model",
@@ -275,7 +275,7 @@ def get_shell_info():
 @click.version_option(version=__version__)
 def main(
     query: tuple,
-    interactive: bool,
+    yolo: bool,
     model: Optional[str],
     api_key: Optional[str],
     attempts: int,
@@ -308,7 +308,7 @@ def main(
 
     model = model or config.get("model", DEFAULT_VALUES["model"])
     api_key = api_key or config.get("api_key", DEFAULT_VALUES["api_key"])
-    interactive = interactive or config.get("interactive", DEFAULT_VALUES["interactive"])
+    interactive = not yolo or config.get("yolo", DEFAULT_VALUES["yolo"])
     attempts = attempts or config.get("attempts", DEFAULT_VALUES["attempts"])
     verify = verify or config.get("ensure", DEFAULT_VALUES["verify"])
     cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
@@ -320,6 +320,13 @@ def main(
         or config.get("synchronous", DEFAULT_VALUES["synchronous"])
     )
     python = python or config.get("python", DEFAULT_VALUES["python"])
+
+    if interactive and not attempts < 0:
+        if verbose:
+            console.print(
+                "[yellow]Interactive mode is enabled. Settings attempts below zero to allow infinite attempts.[/yellow]"
+            )
+        attempts = -1
 
     if verbose:
         pprint(
@@ -340,7 +347,7 @@ def main(
         memory=True,
         model=model,
         stream=not synchronous,
-        json_schema=CommandResult.model_json_schema() if verify else None,
+        json_schema=Result.model_json_schema() if verify else None,
     )
     def get_or_analyze_command(
         query: str,
@@ -381,7 +388,7 @@ def main(
         memory=True,
         model=model,
         stream=not synchronous,
-        json_schema=ScriptResult.model_json_schema() if verify else None,
+        json_schema=Result.model_json_schema() if verify else None,
     )
     def get_or_analyze_python_script(
         query: str,
@@ -431,13 +438,14 @@ def main(
         if return_code == 0 and not verify:
             return
 
-        def execute_llm(mode: Literal["python", "command"], query_text=query_text) -> dict | str:
-            if mode == "python":
+        def execute_llm() -> dict | str:
+            if python:
                 invocation = get_or_analyze_python_script(query_text, last_output)
             else:
                 invocation = get_or_analyze_command(
                     query_text if "sudo" not in query_text else "YOU CANNOT USE SUDO",
-                    last_output)
+                    last_output,
+                )
 
             if synchronous:
                 return invocation
@@ -452,24 +460,15 @@ def main(
 
         if verify:
             with Status("[bold yellow]Communicating with LLM...", console=console):
-                result = (
-                    ScriptResult(**execute_llm("python"))
-                    if python
-                    else CommandResult(**execute_llm("command"))
-                )
+                result = Result(**execute_llm())
         else:
             if synchronous:
                 with Status("[bold yellow]Communicating with LLM...", console=console):
-                    result_string = (
-                        execute_llm("python") if python else execute_llm("command")
-                    )
+                    result_string = execute_llm()
             else:
-                result_string = (
-                    execute_llm("python") if python else execute_llm("command")
-                )
+                result_string = execute_llm()
 
             if python:
-
                 try:
                     script = re.search(
                         r"```python\n(.*?)```", result_string, re.DOTALL
@@ -484,8 +483,8 @@ def main(
                     # assume the script is the result_string
                     script = result_string
 
-                result = ScriptResult(
-                    script=script,
+                result = Result(
+                    command_or_script=script,
                     message_to_user="",
                     the_query_was_satisfied=False,
                     i_have_seen_the_last_terminal_output=False,
@@ -500,8 +499,8 @@ def main(
                     # assume the script is the result_string
                     terminal_command = result_string
 
-                result = CommandResult(
-                    terminal_command_or_shell_script=terminal_command,
+                result = Result(
+                    command_or_script=terminal_command,
                     message_to_user="",
                     the_query_was_satisfied=False,
                     i_have_seen_the_last_terminal_output=False,
@@ -535,15 +534,21 @@ def main(
 
         if synchronous:
             if python:
-                console.print(Panel(Syntax(result.script, "python"), title="Script"))
+                console.print(
+                    Panel(Syntax(result.command_or_script, "python"), title="Script")
+                )
             else:
-                console.print(Panel(Syntax(result.terminal_command_or_shell_script, get_shell_info()), title="Command"))
+                console.print(
+                    Panel(
+                        Syntax(result.command_or_script, get_shell_info()),
+                        title="Command",
+                    )
+                )
 
         if interactive:
-            changes = click.prompt(
+            changes = Prompt.ask(
                 os.linesep
-                + "What changes would you like to make? Hit Enter to run without changes.",
-                type=str,
+                + "[magenta]What changes would you like to make? Hit [bold red]Enter[/] to run without changes.[/]",
                 default="",
             )
             if changes:
@@ -552,10 +557,12 @@ def main(
 
         if python:
             last_output, return_code, script_path = run_script(
-                result.script, cleanup, verbose
+                result.command_or_script,
+                cleanup,
+                verbose,
             )
         else:
-            last_output, return_code = run_command(result.terminal_command_or_shell_script, verbose)
+            last_output, return_code = run_command(result.command_or_script, verbose)
 
         if result.message_to_user and synchronous:
             console.print(Panel(result.message_to_user, title="LLM"))
