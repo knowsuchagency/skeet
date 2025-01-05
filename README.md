@@ -36,9 +36,9 @@ uv tool install skeet
 
 Skeet can be configured using a YAML file at `~/.config/skeet/config.yaml`.
 
-You can support multiple LLM providers by adding a namespace to your config.
+You can support multiple LLM providers by adding a namespace to your config. You can define any namespaces you want, but you **must** have a `default` namespace.
 
-**NOTE:** You must have a `default` namespace.
+To see the full list of available LLM models, see the [LiteLLM documentation](https://docs.litellm.ai/docs/providers). Simply use the appropriate model name as the value for the `model` key.
 
 There aren't any keys that are required for a given namespace, but `model` and `api_key` are recommended.
 
