@@ -1,10 +1,10 @@
 # Skeet 🎯
 
-Describe what you want done, and _Skeet_ will make it happen.
+Master your machine: If you know English, *Skeet* makes you a terminal wizard. 
 
-Like a skilled skeet shooter, _Skeet_ takes your terminal commands and targets them with precision through AI.
+Like a skilled marksman with clay targets, *Skeet* takes your natural language instructions and executes them with precision, transforming them into Python scripts. 
 
-_Skeet_ generates Python scripts using [promptic](https://github.com/knowsuchagency/promptic) and executes them with `uv`. Through [uv scripts](https://docs.astral.sh/uv/guides/scripts/), _Skeet_ can use third-party libraries without virtual environments. 
+Built on [promptic](https://github.com/knowsuchagency/promptic) and powered by [uv](https://github.com/astral-sh/uv), *Skeet* executes these scripts with access to third-party libraries—no virtual environments needed.
 
 _Skeet_ supports any LLM provider available through [LiteLLM](https://docs.litellm.ai/docs/providers), including OpenAI, Anthropic, Azure, local models, and many more!
 
