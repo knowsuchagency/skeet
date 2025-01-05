@@ -12,6 +12,14 @@
 
 ⭐ _Skeet_ supports any LLM provider available through [LiteLLM](https://docs.litellm.ai/docs/providers), including OpenAI, Anthropic, Azure, local models, and many more!
 
+## Installation
+
+The recommended installation method is [uv](https://github.com/astral-sh/uv).
+
+```bash
+uv tool install skeet
+```
+
 ## Examples
 
 ```bash
@@ -23,14 +31,6 @@ skeet "what's size of my downloads folder?"
 # Python scripts (using -p or --python flag)
 skeet --python convert all html files in the current directory to pdf
 skeet -p "how many stars for https://github.com/knowsuchagency/promptic?"
-```
-
-## Installation
-
-The recommended installation method is [uv](https://github.com/astral-sh/uv).
-
-```bash
-uv tool install skeet
 ```
 
 ## Configuration
@@ -47,7 +47,7 @@ There aren't any keys that are required for a given namespace, but `model` and `
 default: # Default namespace
   model: "gpt-4o" # Default LLM model to use
   api_key: "sk-..." # Your LLM API key
-  confirm: false # Whether to prompt for permission before each execution
+  interactive: false # Confirm each command and suggest changes
   attempts: 5 # Maximum number of execution attempts
   verify: false # Whether to verify output with LLM
   cleanup: false # Whether to clean up temporary files
@@ -70,7 +70,7 @@ You can specify which configuration to use with the `--namespace` or `-n` flag:
 
 ```bash
 skeet -n anthropic "what's the weather like?"
-skeet --namespace openai "list files in the current directory"
+skeet --namespace ollama "list files in the current directory"
 ```
 
 If no namespace is specified, the `default` one will be used.

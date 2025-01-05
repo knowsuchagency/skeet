@@ -22,12 +22,12 @@ from rich.pretty import pprint
 from rich.syntax import Syntax
 from ruamel.yaml import YAML
 
-__version__ = "0.9.9"
+__version__ = "1.0.0"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
     "api_key": None,
-    "confirm": False,
+    "interactive": False,
     "attempts": 5,
     "verify": False,
     "cleanup": False,
@@ -36,7 +36,7 @@ DEFAULT_VALUES = {
 }
 
 COMMAND_SYSTEM_PROMPT = """
-You are an expert system administrator tasked with creating shell commands to fulfill user instructions.
+You are an expert system administrator tasked with creating shell commands to fulfill the user's queries.
 Your commands should be concise, use appropriate flags/options, and handle paths and special characters safely.
 
 Focus on:
@@ -48,7 +48,7 @@ Focus on:
 """
 
 PYTHON_SYSTEM_PROMPT = """
-You are an expert Python developer tasked with writing scripts to fulfill user instructions.
+You are an expert Python developer tasked with writing scripts to fulfill user's queries.
 Your scripts should be concise, use modern Python idioms, and leverage appropriate libraries.
 
 Key guidelines:
@@ -57,7 +57,7 @@ Key guidelines:
 - Scripts should be self-contained and handle their own dependencies via uv
 - Script should be as concise as possible while maintaining legibility
 - All scripts should include proper uv script metadata headers with dependencies
-- The script should be written such that it only succeeds if it achieves the goal or answers the user's query. Otherwise, it should fail.
+- The script should be written such that it only succeeds if it satisfies the user's query. Otherwise, it should fail.
 - If successful, the script should print a message to stdout with all relevant information.
 
 Important uv script format:
@@ -107,7 +107,7 @@ class ScriptResult(BaseModel):
 
     script: str
     message_to_user: str
-    the_goal_was_attained: bool = False
+    the_query_was_satisfied: bool = False
     i_have_seen_the_last_terminal_output: bool = False
 
 
@@ -116,7 +116,7 @@ class CommandResult(BaseModel):
 
     terminal_command_or_shell_script: str
     message_to_user: str
-    the_goal_was_attained: bool = False
+    the_query_was_satisfied: bool = False
     i_have_seen_the_last_terminal_output: bool = False
 
 
@@ -166,7 +166,6 @@ def run_script(script: str, cleanup: bool, verbose: bool) -> tuple[str, int, str
 
     try:
         with Status("[bold blue]Running script...", console=console):
-            # Use Popen to stream output in real-time
             process = subprocess.Popen(
                 ["uv", "run", "-q", script_path],
                 stdout=subprocess.PIPE,
@@ -207,12 +206,12 @@ def get_shell_info():
 
 
 @click.command()
-@click.argument("instructions", nargs=-1, required=False)
+@click.argument("query", nargs=-1, required=False)
 @click.option(
-    "--confirm",
-    "-c",
+    "--interactive",
+    "-i",
     is_flag=True,
-    help="Prompt for permission before each execution",
+    help="Interactive mode. Confirm each command and suggest changes.",
 )
 @click.option(
     "--model",
@@ -235,7 +234,7 @@ def get_shell_info():
     "--verify",
     "-e",
     is_flag=True,
-    help="If true, the llm will verify the goal was met after commands or scripts are run. By default, the program will terminate if the script or command returns a zero exit code.",
+    help="If true, the llm will verify the query was satisfied. By default, the program will terminate if the script or command returns a zero exit code.",
 )
 @click.option(
     "--cleanup",
@@ -265,18 +264,18 @@ def get_shell_info():
     "--synchronous",
     "-s",
     is_flag=True,
-    help="If true, the program will NOT stream the output of the script. It will run synchronously.",
+    help="If true, the program will NOT stream the output of the script -- it will run synchronously. This is the default behavior EXCEPT when using python.",
 )
 @click.option(
     "--python",
     "-p",
     is_flag=True,
-    help="If true, the program will use Python to satisfy your instructions.",
+    help="If true, the program will use Python to satisfy your query.",
 )
 @click.version_option(version=__version__)
 def main(
-    instructions: tuple,
-    confirm: bool,
+    query: tuple,
+    interactive: bool,
     model: Optional[str],
     api_key: Optional[str],
     attempts: int,
@@ -297,7 +296,7 @@ def main(
             subprocess.run("uv tool install -P skeet skeet", shell=True)
         return
 
-    if not instructions:
+    if not query:
         ctx = click.get_current_context()
         click.echo(ctx.get_help())
         ctx.exit()
@@ -309,11 +308,11 @@ def main(
 
     model = model or config.get("model", DEFAULT_VALUES["model"])
     api_key = api_key or config.get("api_key", DEFAULT_VALUES["api_key"])
-    confirm = confirm or config.get("confirm", DEFAULT_VALUES["confirm"])
+    interactive = interactive or config.get("interactive", DEFAULT_VALUES["interactive"])
     attempts = attempts or config.get("attempts", DEFAULT_VALUES["attempts"])
     verify = verify or config.get("ensure", DEFAULT_VALUES["verify"])
     cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
-    # if verify is true, then we will run synchronously
+    # if verify is true or if in command mode, then we will run synchronously
     synchronous = (
         synchronous
         or verify
@@ -327,7 +326,7 @@ def main(
             {
                 "model": model,
                 "api_key": api_key[:5] + "..." + api_key[-5:] if api_key else None,
-                "confirm": confirm,
+                "interactive": interactive,
                 "attempts": attempts,
                 "verify": verify,
                 "cleanup": cleanup,
@@ -344,33 +343,33 @@ def main(
         json_schema=CommandResult.model_json_schema() if verify else None,
     )
     def get_or_analyze_command(
-        goal: str,
+        query: str,
         last_terminal_output: str = "",
         platform: str = platform.platform(),
         shell: str = get_shell_info(),
     ):
         """
-        Create or modify an appropriate terminal command or shell script based on the goal, previous output, platform, and shell.
+        Create or modify an appropriate terminal command or shell script based on the query, previous output, platform, and shell.
 
-        If the goal is to be satisfied, the terminal command or shell script must return a zero exit code. For example, if the goal is 'what is using port 8000', account for when the port is not being used like so: 'lsof -i :8000 || echo "port 8000 is not being used"'
+        If the query is to be satisfied, the terminal command or shell script must return a zero exit code. For example, if the query is 'what is using port 8000', account for when the port is not being used like so: 'lsof -i :8000 || echo "port 8000 is not being used"'
 
         Do not include exposition or commentary.
 
-        Goal: '{goal}'
+        Query: '{query}'
         Last Output: ```{last_terminal_output}```
         Platform: {platform}
         Shell: {shell}
         """
 
-    verify_instructions = """
-        Return the terminal command along with whether you have seen the last terminal output, the goal was attained, and a message to the user.
+    verification_instructions = """
+        Return the terminal command along with whether you have seen the last terminal output, the query was satisfied, and a message to the user.
 
         If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
-        If the goal was attained and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
+        If the query was satisfied and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
     """
 
     if verify:
-        get_or_analyze_command.__doc__ += os.linesep + verify_instructions
+        get_or_analyze_command.__doc__ += os.linesep + verification_instructions
     if not synchronous:
         get_or_analyze_command.__doc__ += (
             os.linesep
@@ -385,29 +384,29 @@ def main(
         json_schema=ScriptResult.model_json_schema() if verify else None,
     )
     def get_or_analyze_python_script(
-        goal: str,
+        query: str,
         last_terminal_output: str = "",
         platform: str = platform.platform(),
     ):
         """
-        Create or modify a Python script based on the goal, previous output, and platform. Focus on the script -- avoid unnecessary exposition or commentary.
+        Create or modify a Python script based on the query, previous output, and platform. Focus on the script -- avoid unnecessary exposition or commentary.
 
         If last_terminal_output is provided, analyze it for errors and make necessary corrections.
 
-        Goal: '{goal}'
+        Query: '{query}'
         Last Output: ```{last_terminal_output}```
         Platform: {platform}
         """
 
-    verify_instructions = """
-        Return the script along with whether you have seen the last terminal output, the goal was attained, and a message to the user.
+    verification_instructions = """
+        Return the script along with whether you have seen the last terminal output, the query was satisfied, and a message to the user.
 
         If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
-        If the goal was attained and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
+        If the query was satisfied and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
     """
 
     if verify:
-        get_or_analyze_python_script.__doc__ += os.linesep + verify_instructions
+        get_or_analyze_python_script.__doc__ += os.linesep + verification_instructions
     if not synchronous:
         get_or_analyze_python_script.__doc__ += (
             os.linesep
@@ -417,7 +416,7 @@ def main(
     if api_key:
         litellm.api_key = api_key
 
-    instruction_text = " ".join(instructions)
+    query_text = " ".join(query)
 
     last_output = None
     iteration = 0
@@ -432,12 +431,12 @@ def main(
         if return_code == 0 and not verify:
             return
 
-        def execute_llm(mode: Literal["python", "command"], instruction_text=instruction_text) -> dict | str:
+        def execute_llm(mode: Literal["python", "command"], query_text=query_text) -> dict | str:
             if mode == "python":
-                invocation = get_or_analyze_python_script(instruction_text, last_output)
+                invocation = get_or_analyze_python_script(query_text, last_output)
             else:
                 invocation = get_or_analyze_command(
-                    instruction_text if "sudo" not in instruction_text else "YOU CANNOT USE SUDO",
+                    query_text if "sudo" not in query_text else "YOU CANNOT USE SUDO",
                     last_output)
 
             if synchronous:
@@ -488,7 +487,7 @@ def main(
                 result = ScriptResult(
                     script=script,
                     message_to_user="",
-                    the_goal_was_attained=False,
+                    the_query_was_satisfied=False,
                     i_have_seen_the_last_terminal_output=False,
                 )
 
@@ -504,7 +503,7 @@ def main(
                 result = CommandResult(
                     terminal_command_or_shell_script=terminal_command,
                     message_to_user="",
-                    the_goal_was_attained=False,
+                    the_query_was_satisfied=False,
                     i_have_seen_the_last_terminal_output=False,
                 )
 
@@ -516,7 +515,7 @@ def main(
             console.print(
                 Panel(
                     last_output,
-                    title="Script Output",
+                    title="Output",
                     subtitle=script_path if python and not cleanup else "",
                     border_style="green" if return_code == 0 else "red",
                 )
@@ -525,7 +524,7 @@ def main(
         if all(
             [
                 result.i_have_seen_the_last_terminal_output,
-                result.the_goal_was_attained,
+                result.the_query_was_satisfied,
                 last_output,
                 return_code == 0,
             ]
@@ -540,7 +539,7 @@ def main(
             else:
                 console.print(Panel(Syntax(result.terminal_command_or_shell_script, get_shell_info()), title="Command"))
 
-        if confirm:
+        if interactive:
             changes = click.prompt(
                 os.linesep
                 + "What changes would you like to make? Hit Enter to run without changes.",
@@ -548,7 +547,7 @@ def main(
                 default="",
             )
             if changes:
-                instruction_text = changes
+                query_text = changes
                 continue
 
         if python:
