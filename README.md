@@ -6,7 +6,6 @@
 ![skeet](https://github.com/user-attachments/assets/e4253aa6-3069-47bf-a7be-7da5bcf79413)
 
 
-
 🔥 Think of _Skeet_ as [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) on steroids. It won't give up on the first try and works with practically any LLM provider, putting you in full control of your terminal.
 
 🎯 Like a skilled marksman who keeps shooting until they hit their target, _Skeet_ transforms your natural language instructions into precise shell commands or Python scripts, adapting and retrying automatically until the job is done.
