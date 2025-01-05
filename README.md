@@ -1,12 +1,10 @@
-# Skeet
+# 🦅 Skeet 🎯
 
-Describe what you want done in your terminal, and *Skeet* will use AI to make it happen. 
+Describe what you want done, and *Skeet* will make it happen.
 
-Skeet works by leveraging [promptic](https://github.com/knowsuchagency/promptic) to generate Python scripts and `uv` to run them. By leveraging [uv scripts](https://docs.astral.sh/uv/guides/scripts/), Skeet can can execute Python scripts that have dependencies on third-party libraries without needing virtual environments.
+Like a skilled skeet shooter, *Skeet* takes your terminal commands and targets them with precision through AI. 
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/aaeddf6d-e9a0-4629-8a28-ef462029fba3" width="300" alt="logo">
-</p>
+*Skeet* works by using [promptic](https://github.com/knowsuchagency/promptic) to generate Python scripts and `uv` to execute them. Through [uv scripts](https://docs.astral.sh/uv/guides/scripts/), *Skeet* can use third-party libraries without virtual environments.
 
 
 ## Examples

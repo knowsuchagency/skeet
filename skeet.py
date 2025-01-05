@@ -19,7 +19,7 @@ from rich.status import Status
 from rich.syntax import Syntax
 from ruamel.yaml import YAML
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 
 SYSTEM_PROMPT = """
