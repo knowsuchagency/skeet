@@ -8,6 +8,8 @@ import tempfile
 from typing import Optional
 import platform
 from pathlib import Path
+import re
+from json.decoder import JSONDecodeError
 
 import click
 from litellm import litellm
@@ -16,17 +18,27 @@ from pydantic import BaseModel
 from rich.console import Console
 from rich.panel import Panel
 from rich.status import Status
-from rich.syntax import Syntax
+from rich.pretty import pprint
 from ruamel.yaml import YAML
 
-__version__ = "0.6.2"
+__version__ = "0.6.3"
 
+DEFAULT_VALUES = {
+    "model": "gpt-4o",
+    "api_key": None,
+    "control": False,
+    "attempts": 5,
+    "ensure": False,
+    "no_loop": False,
+    "cleanup": False,
+}
 
 SYSTEM_PROMPT = """
 You are an expert Python developer tasked with writing scripts to fulfill user instructions.
 Your scripts should be concise, use modern Python idioms, and leverage appropriate libraries.
 
 Key guidelines:
+- Enclose the script in triple backticks with python as the language
 - Return complete, runnable Python scripts that use the necessary imports
 - Prefer standard library solutions when appropriate
 - Scripts should be self-contained and handle their own dependencies via uv
@@ -72,9 +84,9 @@ yaml = YAML()
 config_path = Path.home() / ".config" / "skeet" / "config.yaml"
 
 if config_path.exists():
-    config = yaml.load(config_path)
+    configurations = yaml.load(config_path)
 else:
-    config = {}
+    configurations = {}
 
 
 class ScriptResult(BaseModel):
@@ -125,41 +137,35 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
     "--control",
     "-c",
     is_flag=True,
-    default=config.get("control", False),
     help="Prompt for permission before each execution",
 )
 @click.option(
     "--model",
     "-m",
     envvar="SKEET_MODEL",
-    default=config.get("model", "gpt-4o"),
     help="Specify the LLM model to use",
 )
 @click.option(
     "--api-key",
     "-k",
     envvar="SKEET_API_KEY",
-    default=config.get("api_key", None),
     help="API key for the LLM service",
 )
 @click.option(
     "--attempts",
     "-a",
-    default=config.get("attempts", 5),
     help="Maximum number of script execution attempts. If less than 0, the program will loop until the script is successful, regardless of errors.",
 )
 @click.option(
     "--ensure",
     "-e",
     is_flag=True,
-    default=config.get("ensure", False),
     help="If true, the llm will check the output of the script and determine if the goal was met. By default, the program will terminate if the script returns a zero exit code.",
 )
 @click.option(
     "--no-loop",
-    "-n",
+    "-o",
     is_flag=True,
-    default=config.get("no_loop", False),
     help="If true, the program will not loop and will only run once. By default, the program will keep running until the instructions are satisfied.",
 )
 @click.option(
@@ -169,7 +175,22 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
     help="If true, the program will clean up the temporary file after running the script.",
 )
 @click.option(
-    "--upgrade", "-U", is_flag=True, help="Upgrade Skeet to the latest version with uv."
+    "--upgrade",
+    "-U",
+    is_flag=True,
+    help="Upgrade Skeet to the latest version with uv.",
+)
+@click.option(
+    "--namespace",
+    "-n",
+    default="default",
+    help="Specify the configuration namespace to use for the LLM model.",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="If true, the program will print verbose output.",
 )
 @click.version_option(version=__version__)
 def main(
@@ -182,6 +203,8 @@ def main(
     no_loop: bool,
     cleanup: bool,
     upgrade: bool,
+    namespace: str,
+    verbose: bool,
 ):
     """Describe what you want done, and Skeet will use AI to make it happen."""
 
@@ -197,16 +220,44 @@ def main(
         click.echo(ctx.get_help())
         ctx.exit()
 
+    if namespace not in configurations:
+        raise ValueError(f"Namespace {namespace} not found in config.yaml")
+
+    config = configurations[namespace]
+
+    model = model or config.get("model", DEFAULT_VALUES["model"])
+    api_key = api_key or config.get("api_key", DEFAULT_VALUES["api_key"])
+    control = control or config.get("control", DEFAULT_VALUES["control"])
+    attempts = attempts or config.get("attempts", DEFAULT_VALUES["attempts"])
+    ensure = ensure or config.get("ensure", DEFAULT_VALUES["ensure"])
+    no_loop = no_loop or config.get("no_loop", DEFAULT_VALUES["no_loop"])
+    cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
+
+    if verbose:
+        pprint(
+            {
+                "model": model,
+                "api_key": api_key,
+                "control": control,
+                "attempts": attempts,
+                "ensure": ensure,
+                "no_loop": no_loop,
+                "cleanup": cleanup,
+            }
+        )
+
     @llm(
         system=SYSTEM_PROMPT,
         memory=True,
         model=model,
+        stream=True,
+        # debug=True,
     )
     def invoke_llm(
         goal: str,
         last_terminal_output: str = "",
         platform: str = platform.platform(),
-    ) -> ScriptResult:
+    ):
         """Create or modify a Python script based on the goal and previous output.
 
         If last_terminal_output is provided, analyze it for errors and make necessary corrections.
@@ -233,11 +284,32 @@ def main(
     while attempts < 0 or iteration < attempts:
         iteration += 1
 
+        if verbose:
+            pprint({"iteration": iteration, "return_code": return_code})
+
         if return_code == 0 and not ensure:
             return
 
-        with Status("[bold yellow]Communicating with LLM...", console=console):
-            result = invoke_llm(instruction_text, last_output)
+        # with Status("[bold yellow]Communicating with LLM...", console=console):
+        result_string = ""
+        for chunk in invoke_llm(instruction_text, last_output):
+            console.print(chunk, end="", markup=True)
+            result_string += chunk
+        # use regex to extract the script from result_string assuming it's in triple backticks
+        try:
+            script = re.search(r"```python\n(.*?)```", result_string, re.DOTALL).group(
+                1
+            )
+        except AttributeError:
+            console.print("[red]Failed to extract script from output.[/red]")
+            console.print(Panel(result_string, title="LLM Output", border_style="red"))
+            return
+        result = ScriptResult(
+            script=script,
+            message_to_user="",
+            the_goal_was_attained=False,
+            i_have_seen_the_last_terminal_output=False,
+        )
 
         if iteration == attempts:
             console.print("[red]Maximum iterations reached without success[/red]")
@@ -253,11 +325,12 @@ def main(
         ):
             return
 
-        console.print(Panel(Syntax(result.script, "python"), title="Script"))
+        # console.print(Panel(Syntax(result.script, "python"), title="Script"))
 
         if control:
             changes = click.prompt(
-                "What changes would you like to make to the script? Hit Enter to run without changes.",
+                os.linesep
+                + "What changes would you like to make to the script? Hit Enter to run without changes.",
                 type=str,
                 default="",
             )
@@ -267,7 +340,7 @@ def main(
 
         last_output, return_code, script_path = run_script(result.script, cleanup)
 
-        console.print(Panel(result.message_to_user, title="LLM"))
+        # console.print(Panel(result.message_to_user, title="LLM"))
 
         console.print(
             Panel(
