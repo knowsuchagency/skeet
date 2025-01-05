@@ -9,7 +9,6 @@ from typing import Optional
 import platform
 from pathlib import Path
 import re
-from json.decoder import JSONDecodeError
 
 import click
 from litellm import litellm
@@ -19,6 +18,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.status import Status
 from rich.pretty import pprint
+from rich.syntax import Syntax
 from ruamel.yaml import YAML
 
 __version__ = "0.6.3"
@@ -31,6 +31,7 @@ DEFAULT_VALUES = {
     "ensure": False,
     "no_loop": False,
     "cleanup": False,
+    "synchronous": False,
 }
 
 SYSTEM_PROMPT = """
@@ -192,6 +193,12 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
     is_flag=True,
     help="If true, the program will print verbose output.",
 )
+@click.option(
+    "--synchronous",
+    "-s",
+    is_flag=True,
+    help="If true, the program will NOT stream the output of the script. It will run synchronously.",
+)
 @click.version_option(version=__version__)
 def main(
     instructions: tuple,
@@ -205,6 +212,7 @@ def main(
     upgrade: bool,
     namespace: str,
     verbose: bool,
+    synchronous: bool,
 ):
     """Describe what you want done, and Skeet will use AI to make it happen."""
 
@@ -232,17 +240,20 @@ def main(
     ensure = ensure or config.get("ensure", DEFAULT_VALUES["ensure"])
     no_loop = no_loop or config.get("no_loop", DEFAULT_VALUES["no_loop"])
     cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
+    # if ensure is true, then we will run synchronously
+    synchronous = synchronous or ensure or config.get("synchronous", DEFAULT_VALUES["synchronous"])
 
     if verbose:
         pprint(
             {
                 "model": model,
-                "api_key": api_key,
+                "api_key": api_key[:5] + "..." + api_key[-5:],
                 "control": control,
                 "attempts": attempts,
                 "ensure": ensure,
                 "no_loop": no_loop,
                 "cleanup": cleanup,
+                "synchronous": synchronous,
             }
         )
 
@@ -250,27 +261,32 @@ def main(
         system=SYSTEM_PROMPT,
         memory=True,
         model=model,
-        stream=True,
-        # debug=True,
+        stream=not synchronous,
+        json_schema=ScriptResult.model_json_schema() if ensure else None,
     )
     def invoke_llm(
         goal: str,
         last_terminal_output: str = "",
         platform: str = platform.platform(),
     ):
-        """Create or modify a Python script based on the goal and previous output.
+        """Create or modify a Python script based on the goal, previous output, and platform.
 
         If last_terminal_output is provided, analyze it for errors and make necessary corrections.
-        Return the script along with whether you have seen the last terminal output, the goal was attained, and a message to the user.
-
-
+        
         Goal: '{goal}'
         Last Output: ```{last_terminal_output}```
         Platform: {platform}
+        """
+
+    ensure_instructions = """
+        Return the script along with whether you have seen the last terminal output, the goal was attained, and a message to the user.
 
         If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
         If the goal was attained and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
-        """
+    """
+
+    if ensure:
+        invoke_llm.__doc__ += os.linesep + ensure_instructions
 
     if api_key:
         litellm.api_key = api_key
@@ -290,30 +306,60 @@ def main(
         if return_code == 0 and not ensure:
             return
 
-        # with Status("[bold yellow]Communicating with LLM...", console=console):
-        result_string = ""
-        for chunk in invoke_llm(instruction_text, last_output):
-            console.print(chunk, end="", markup=True)
-            result_string += chunk
-        # use regex to extract the script from result_string assuming it's in triple backticks
-        try:
-            script = re.search(r"```python\n(.*?)```", result_string, re.DOTALL).group(
-                1
+        def execute_llm():
+            invocation = invoke_llm(instruction_text, last_output)
+
+            if synchronous:
+                return invocation
+            
+            result = ""
+            for chunk in invocation:
+                if verbose or not ensure:
+                    console.print(chunk, end="")
+                result += chunk
+            return result
+
+        if ensure:
+            with Status("[bold yellow]Communicating with LLM...", console=console):
+                result = ScriptResult(**execute_llm())
+        else:
+            if synchronous:
+                with Status("[bold yellow]Communicating with LLM...", console=console):
+                    result_string = execute_llm()
+            else:
+                result_string = execute_llm()
+
+            try:
+                script = re.search(
+                    r"```python\n(.*?)```", result_string, re.DOTALL
+                ).group(1)
+            except AttributeError:
+                console.print("[red]Failed to extract script from output.[/red]")
+                console.print(
+                    Panel(result_string, title="LLM Output", border_style="red")
+                )
+                return
+
+            result = ScriptResult(
+                script=script,
+                message_to_user="",
+                the_goal_was_attained=False,
+                i_have_seen_the_last_terminal_output=False,
             )
-        except AttributeError:
-            console.print("[red]Failed to extract script from output.[/red]")
-            console.print(Panel(result_string, title="LLM Output", border_style="red"))
-            return
-        result = ScriptResult(
-            script=script,
-            message_to_user="",
-            the_goal_was_attained=False,
-            i_have_seen_the_last_terminal_output=False,
-        )
 
         if iteration == attempts:
             console.print("[red]Maximum iterations reached without success[/red]")
             return
+
+        def display_result():
+            console.print(
+                Panel(
+                    last_output,
+                    title="Script Output",
+                    subtitle=script_path if not cleanup else "",
+                    border_style="green" if return_code == 0 else "red",
+                )
+            )
 
         if all(
             [
@@ -323,9 +369,12 @@ def main(
                 return_code == 0,
             ]
         ):
+            if ensure:
+                display_result()
             return
 
-        # console.print(Panel(Syntax(result.script, "python"), title="Script"))
+        if synchronous:
+            console.print(Panel(Syntax(result.script, "python"), title="Script"))
 
         if control:
             changes = click.prompt(
@@ -340,16 +389,11 @@ def main(
 
         last_output, return_code, script_path = run_script(result.script, cleanup)
 
-        # console.print(Panel(result.message_to_user, title="LLM"))
+        if result.message_to_user and synchronous:
+            console.print(Panel(result.message_to_user, title="LLM"))
 
-        console.print(
-            Panel(
-                last_output,
-                title="Script Output",
-                subtitle=script_path if not cleanup else "",
-                border_style="green" if return_code == 0 else "red",
-            )
-        )
+        if not ensure:
+            display_result()
 
         if no_loop:
             break
