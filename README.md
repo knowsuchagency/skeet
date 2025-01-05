@@ -31,7 +31,11 @@ uv tool install skeet
 
 ## Configuration
 
-Skeet can be configured using a YAML file at `~/.config/skeet/config.yaml`. The configuration now supports multiple namespaces for different LLM providers and configurations.
+Skeet can be configured using a YAML file at `~/.config/skeet/config.yaml`. 
+
+You can support multiple LLM providers by adding a namespace to your config. 
+
+**NOTE:** You must use a `default` namespace.
 
 There aren't any keys that are required for a given namespace, but model and api_key are recommended.
 
