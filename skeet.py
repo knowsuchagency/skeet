@@ -7,6 +7,8 @@ import subprocess
 import tempfile
 from typing import Optional
 import platform
+from pathlib import Path
+import re
 
 import click
 from litellm import litellm
@@ -15,9 +17,21 @@ from pydantic import BaseModel
 from rich.console import Console
 from rich.panel import Panel
 from rich.status import Status
+from rich.pretty import pprint
 from rich.syntax import Syntax
+from ruamel.yaml import YAML
 
-console = Console()
+__version__ = "0.7.5"
+
+DEFAULT_VALUES = {
+    "model": "gpt-4o",
+    "api_key": None,
+    "control": False,
+    "attempts": 5,
+    "ensure": False,
+    "cleanup": False,
+    "synchronous": False,
+}
 
 SYSTEM_PROMPT = """
 You are an expert Python developer tasked with writing scripts to fulfill user instructions.
@@ -26,8 +40,8 @@ Your scripts should be concise, use modern Python idioms, and leverage appropria
 Key guidelines:
 - Return complete, runnable Python scripts that use the necessary imports
 - Prefer standard library solutions when appropriate
-- Include detailed error handling and user feedback
 - Scripts should be self-contained and handle their own dependencies via uv
+- Script should be as concise as possible while maintaining legibility
 - All scripts should include proper uv script metadata headers with dependencies
 - The script should be written such that it only succeeds if it achieves the goal or answers the user's query. Otherwise, it should fail.
 - If successful, the script should print a message to stdout with all relevant information.
@@ -62,6 +76,17 @@ Remember to handle common scenarios like:
 Focus on writing reliable, production-quality code that solves the user's needs efficiently.
 """
 
+console = Console()
+
+yaml = YAML()
+
+config_path = Path.home() / ".config" / "skeet" / "config.yaml"
+
+if config_path.exists():
+    configurations = yaml.load(config_path)
+else:
+    configurations = {}
+
 
 class ScriptResult(BaseModel):
     """Model for LLM response structure"""
@@ -79,87 +104,199 @@ def stream_output(process, output_queue):
     process.stdout.close()
 
 
-def run_script(script: str) -> tuple[str, int]:
+def run_script(script: str, cleanup: bool, verbose: bool) -> tuple[str, int, str]:
     """Run the given script using uv and return the output"""
 
-    # Create temporary script file
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(script)
         script_path = f.name
 
     try:
-        with Status("[bold blue]Running script...", console=console) as status:
-            # Run script using uv and capture output
-            process = subprocess.run(
-                ["uv", "run", script_path],
+        with Status("[bold blue]Running script...", console=console):
+            # Use Popen to stream output in real-time
+            process = subprocess.Popen(
+                ["uv", "run", "-q", script_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                check=False,
+                bufsize=1,
+                universal_newlines=True,
             )
 
-            return process.stdout or "", process.returncode
+            # Collect output while streaming it
+            output_lines = []
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                if line:
+                    output_lines.append(line)
+                    if verbose:
+                        console.print(line.rstrip())
+
+            process.stdout.close()
+            return_code = process.wait()
+
+            return "".join(output_lines).strip(), return_code, script_path
 
     finally:
-        # Clean up temporary file
-        os.unlink(script_path)
+        if cleanup:
+            # Clean up temporary file
+            os.unlink(script_path)
 
 
 @click.command()
-@click.argument("instructions", nargs=-1, required=True)
+@click.argument("instructions", nargs=-1, required=False)
 @click.option(
-    "--control", "-c", is_flag=True, help="Prompt for permission before each execution"
+    "--control",
+    "-c",
+    is_flag=True,
+    help="Prompt for permission before each execution",
 )
 @click.option(
     "--model",
     "-m",
-    envvar="BROSKI_MODEL",
-    default="gpt-4o",
+    envvar="SKEET_MODEL",
     help="Specify the LLM model to use",
 )
-@click.option("--api-key", envvar="HOMES_API_KEY", help="API key for the LLM service")
 @click.option(
-    "--max-iterations",
-    "-i",
-    default=5,
-    help="Maximum number of script generation iterations",
+    "--api-key",
+    "-k",
+    envvar="SKEET_API_KEY",
+    help="API key for the LLM service",
 )
 @click.option(
-    "--check",
+    "--attempts",
+    "-a",
+    help="Maximum number of script execution attempts. If less than 0, the program will loop until the script is successful, regardless of errors.",
+)
+@click.option(
+    "--ensure",
+    "-e",
     is_flag=True,
-    help="If true, the llm will check the output of the script and determine if the goal was met. Else, the program will terminate if the script returns a zero exit code.",
+    help="If true, the llm will check the output of the script and determine if the goal was met. By default, the program will terminate if the script returns a zero exit code.",
 )
+@click.option(
+    "--cleanup",
+    "-x",
+    is_flag=True,
+    help="If true, the program will clean up the temporary file after running the script.",
+)
+@click.option(
+    "--upgrade",
+    "-U",
+    is_flag=True,
+    help="Upgrade Skeet to the latest version with uv.",
+)
+@click.option(
+    "--namespace",
+    "-n",
+    default="default",
+    help="Specify the configuration namespace to use for the LLM model.",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="If true, the program will print verbose output.",
+)
+@click.option(
+    "--synchronous",
+    "-s",
+    is_flag=True,
+    help="If true, the program will NOT stream the output of the script. It will run synchronously.",
+)
+@click.version_option(version=__version__)
 def main(
     instructions: tuple,
     control: bool,
     model: Optional[str],
     api_key: Optional[str],
-    max_iterations: int,
-    check: bool,
+    attempts: int,
+    ensure: bool,
+    cleanup: bool,
+    upgrade: bool,
+    namespace: str,
+    verbose: bool,
+    synchronous: bool,
 ):
-    """Generate and run Python scripts based on natural language instructions"""
+    """Describe what you want done, and Skeet will use AI to make it happen."""
+
+    assert attempts != 0, "Attempts must be greater or less than 0"
+
+    if upgrade:
+        with Status("[bold yellow]Upgrading Skeet...", console=console):
+            subprocess.run("uv tool install -P skeet skeet", shell=True)
+        return
+
+    if not instructions:
+        ctx = click.get_current_context()
+        click.echo(ctx.get_help())
+        ctx.exit()
+
+    if namespace not in configurations:
+        raise ValueError(f"Namespace {namespace} not found in config.yaml")
+
+    config = configurations[namespace]
+
+    model = model or config.get("model", DEFAULT_VALUES["model"])
+    api_key = api_key or config.get("api_key", DEFAULT_VALUES["api_key"])
+    control = control or config.get("control", DEFAULT_VALUES["control"])
+    attempts = attempts or config.get("attempts", DEFAULT_VALUES["attempts"])
+    ensure = ensure or config.get("ensure", DEFAULT_VALUES["ensure"])
+    cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
+    # if ensure is true, then we will run synchronously
+    synchronous = (
+        synchronous
+        or ensure
+        or config.get("synchronous", DEFAULT_VALUES["synchronous"])
+    )
+
+    if verbose:
+        pprint(
+            {
+                "model": model,
+                "api_key": api_key[:5] + "..." + api_key[-5:] if api_key else None,
+                "control": control,
+                "attempts": attempts,
+                "ensure": ensure,
+                "cleanup": cleanup,
+                "synchronous": synchronous,
+            }
+        )
 
     @llm(
         system=SYSTEM_PROMPT,
         memory=True,
         model=model,
+        stream=not synchronous,
+        json_schema=ScriptResult.model_json_schema() if ensure else None,
     )
     def invoke_llm(
-        goal: str, last_terminal_output: str = "", platform: str = platform.platform()
-    ) -> ScriptResult:
-        """Create or modify a Python script based on the goal and previous output.
+        goal: str,
+        last_terminal_output: str = "",
+        platform: str = platform.platform(),
+    ):
+        """Create or modify a Python script based on the goal, previous output, and platform.
 
         If last_terminal_output is provided, analyze it for errors and make necessary corrections.
-        Return the script along with whether you have seen the last terminal output, the goal was attained, and a message to the user.
-
 
         Goal: '{goal}'
         Last Output: ```{last_terminal_output}```
         Platform: {platform}
+        """
+
+    ensure_instructions = """
+        Return the script along with whether you have seen the last terminal output, the goal was attained, and a message to the user.
 
         If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
         If the goal was attained and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
-        """
+    """
+
+    if ensure:
+        invoke_llm.__doc__ += os.linesep + ensure_instructions
+    if not synchronous:
+        invoke_llm.__doc__ += os.linesep + "Enclose the script in triple backticks with python as the language."
 
     if api_key:
         litellm.api_key = api_key
@@ -170,19 +307,71 @@ def main(
     iteration = 0
     return_code = -1
 
-    while iteration < max_iterations:
+    while attempts < 0 or iteration < attempts:
         iteration += 1
 
-        if return_code == 0 and not check:
-            console.print(f"[green]Success[/green]")
+        if verbose:
+            pprint({"iteration": iteration, "return_code": return_code})
+
+        if return_code == 0 and not ensure:
             return
 
-        with Status("[bold yellow]Communicating with LLM...", console=console):
-            result = invoke_llm(instruction_text, last_output)
+        def execute_llm() -> dict | str:
+            invocation = invoke_llm(instruction_text, last_output)
 
-        if iteration == max_iterations:
+            if synchronous:
+                return invocation
+
+            result = ""
+            for chunk in invocation:
+                if verbose or not ensure:
+                    console.print(chunk, end="")
+                result += chunk
+            print()
+            return result
+
+        if ensure:
+            with Status("[bold yellow]Communicating with LLM...", console=console):
+                result = ScriptResult(**execute_llm())
+        else:
+            if synchronous:
+                with Status("[bold yellow]Communicating with LLM...", console=console):
+                    result_string = execute_llm()
+            else:
+                result_string = execute_llm()
+
+            try:
+                script = re.search(
+                    r"```python\n(.*?)```", result_string, re.DOTALL
+                ).group(1)
+            except AttributeError:
+                console.print("[yellow]Failed to extract script from output.[/yellow]")
+                console.print(
+                    Panel(result_string, title="LLM Output", border_style="yellow")
+                )
+                # assume the script is the result_string
+                script = result_string
+
+            result = ScriptResult(
+                script=script,
+                message_to_user="",
+                the_goal_was_attained=False,
+                i_have_seen_the_last_terminal_output=False,
+            )
+
+        if iteration == attempts:
             console.print("[red]Maximum iterations reached without success[/red]")
             return
+
+        def display_result():
+            console.print(
+                Panel(
+                    last_output,
+                    title="Script Output",
+                    subtitle=script_path if not cleanup else "",
+                    border_style="green" if return_code == 0 else "red",
+                )
+            )
 
         if all(
             [
@@ -192,21 +381,31 @@ def main(
                 return_code == 0,
             ]
         ):
-            console.print(f"[green]Success[/green]")
+            if ensure:
+                display_result()
             return
 
-        console.print(Panel(Syntax(result.script, "python"), title="Script"))
+        if synchronous:
+            console.print(Panel(Syntax(result.script, "python"), title="Script"))
 
         if control:
-            if not click.confirm("Execute this script?"):
-                console.print("Execution cancelled")
-                return
+            changes = click.prompt(
+                os.linesep
+                + "What changes would you like to make to the script? Hit Enter to run without changes.",
+                type=str,
+                default="",
+            )
+            if changes:
+                instruction_text = changes
+                continue
 
-        last_output, return_code = run_script(result.script)
+        last_output, return_code, script_path = run_script(result.script, cleanup, verbose)
 
-        console.print(Panel(result.message_to_user, title="Message to User"))
+        if result.message_to_user and synchronous:
+            console.print(Panel(result.message_to_user, title="LLM"))
 
-        console.print(Panel(last_output, title="Script Output"))
+        if not ensure:
+            display_result()
 
 
 if __name__ == "__main__":

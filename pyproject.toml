@@ -1,14 +1,23 @@
+[build-system]
+build-backend = "flit_core.buildapi"
+requires = ["flit_core >=3.2,<4"]
+
 [project]
 dependencies = [
   "click>=8.1.8",
   "promptic>=4.0.1",
   "rich>=13.9.4",
+  "ruamel-yaml>=0.18.8",
 ]
-description = "Add your description here"
+description = "Describe what you want done in your terminal, and Skeet will use AI to make it happen."
+license = {file = "LICENSE"}
 name = "skeet"
 readme = "README.md"
 requires-python = ">=3.11"
-version = "0.4.1"
+dynamic = ["version"]
+
+[project.urls]
+"Source" = "https://github.com/knowsuchagency/skeet"
 
 [project.scripts]
 skeet = "skeet:main"
