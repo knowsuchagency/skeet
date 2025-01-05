@@ -1,4 +1,4 @@
-# 🦅 Skeet 🎯
+# Skeet 🎯
 
 Describe what you want done, and _Skeet_ will make it happen.
 
