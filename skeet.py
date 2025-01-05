@@ -548,7 +548,7 @@ def main(
         if interactive:
             changes = Prompt.ask(
                 os.linesep
-                + "[cyan]What changes would you like to make? Hit [black]Enter[/black] to run without changes.[/cyan]",
+                + "[magenta]What changes would you like to make? Hit [bold red]Enter[/] to run without changes.[/]",
                 default="",
             )
             if changes:
