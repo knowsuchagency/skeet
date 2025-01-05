@@ -2,9 +2,9 @@
 
 Master your machine: If you know English, _Skeet_ makes you a terminal wizard.
 
-Like a skilled marksman with clay targets, _Skeet_ takes your natural language instructions and executes them with precision, transforming them into shell commands or Python scripts.
+Like a skilled marksman who keeps shooting until they hit their target, _Skeet_ transforms your natural language instructions into precise shell commands or Python scripts, adapting and retrying automatically until the job is done.
 
-Built on [promptic](https://github.com/knowsuchagency/promptic) and powered by [uv](https://github.com/astral-sh/uv), _Skeet_ can execute Python scripts with access to third-party libraries—no virtual environments needed.
+Built on [promptic](https://github.com/knowsuchagency/promptic) and powered by [uv](https://github.com/astral-sh/uv), _Skeet_ can execute Python scripts with access to third-party libraries—no virtual environments needed. When a command fails, _Skeet_ analyzes the output and adjusts its approach, ensuring your goals are met.
 
 _Skeet_ supports any LLM provider available through [LiteLLM](https://docs.litellm.ai/docs/providers), including OpenAI, Anthropic, Azure, local models, and many more!
 
