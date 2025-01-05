@@ -11,7 +11,7 @@ Skeet works by leveraging [promptic](https://github.com/knowsuchagency/promptic)
 
 ## Examples
 
-<script src="https://asciinema.org/a/697023.js" id="asciicast-697023" async="true"></script>
+![skeet](https://github.com/user-attachments/assets/aee1e53c-9440-4aac-b89c-75d1df9fd692)
 
 ```bash
 
@@ -65,3 +65,5 @@ no_loop: false # Whether to run only once without retrying
 - Error handling and automatic retry
 - Configurable LLM models
 - Rich terminal output with syntax highlighting
+
+[![asciicast](https://asciinema.org/a/697023.svg)](https://asciinema.org/a/697023)
