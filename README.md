@@ -1,6 +1,6 @@
 
 <h3 align="center">
-🧞 <i>Skeet</i> - <i>Skeet</i> is like a genie that lives in your terminal. Tell it what you want, and <i>Skeet</i> will make your wishes come true. 💫
+🧞 <i>Skeet</i> - <i>Skeet</i> is like a genie that lives in your terminal. Tell it what you want, and <i>Skeet</i> makes your wishes come true. 💫
 </h3> 
 
 ![skeet](https://github.com/user-attachments/assets/e4253aa6-3069-47bf-a7be-7da5bcf79413)
