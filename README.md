@@ -26,6 +26,10 @@ The recommended installation method is [uv](https://github.com/astral-sh/uv).
 uv tool install skeet
 ```
 
+## Demo
+
+[![asciicast](https://asciinema.org/a/697025.svg)](https://asciinema.org/a/697025)
+
 ## Configuration
 
 Skeet can be configured using a YAML file at `~/.config/skeet/config.yaml`. 
@@ -83,7 +87,3 @@ If no namespace is specified, the `default` one will be used.
 - Error handling and automatic retry
 - Configurable LLM models
 - Rich terminal output with syntax highlighting
-
-## Demo
-
-[![asciicast](https://asciinema.org/a/697025.svg)](https://asciinema.org/a/697025)
