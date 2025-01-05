@@ -32,7 +32,7 @@ uv tool install skeet
 
 ## Demo
 
-[![asciicast](https://asciinema.org/a/697025.svg)](https://asciinema.org/a/697025)
+[![asciicast](https://asciinema.org/a/697032.svg)](https://asciinema.org/a/697032)
 
 ## Configuration
 
