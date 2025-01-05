@@ -4,7 +4,7 @@ Describe what you want done, and _Skeet_ will make it happen.
 
 Like a skilled skeet shooter, _Skeet_ takes your terminal commands and targets them with precision through AI.
 
-_Skeet_ works by using [promptic](https://github.com/knowsuchagency/promptic) to generate Python scripts and `uv` to execute them. Through [uv scripts](https://docs.astral.sh/uv/guides/scripts/), _Skeet_ can use third-party libraries without virtual environments.
+_Skeet_ generates Python scripts using [promptic](https://github.com/knowsuchagency/promptic) and executes them with `uv`. Through [uv scripts](https://docs.astral.sh/uv/guides/scripts/), _Skeet_ can use third-party libraries without virtual environments.
 
 ## Examples
 
