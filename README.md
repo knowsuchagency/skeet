@@ -38,7 +38,7 @@ Skeet can be configured using a YAML file at `~/.config/skeet/config.yaml`.
 None of the options are required, but `model` and `api_key` are recommended.
 
 ```yaml
-model: "gpt-4" # Default LLM model to use
+model: "gpt-4o" # Default LLM model to use
 api_key: "sk-..." # Your LLM API key
 control: false # Whether to prompt for permission before each execution
 attempts: 5 # Maximum number of script execution attempts
