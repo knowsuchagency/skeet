@@ -1,3 +1,4 @@
+from typing_extensions import Literal
 import warnings
 
 warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:*")
@@ -21,19 +22,32 @@ from rich.pretty import pprint
 from rich.syntax import Syntax
 from ruamel.yaml import YAML
 
-__version__ = "0.7.9"
+__version__ = "0.8.0"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
     "api_key": None,
-    "control": False,
+    "confirm": False,
     "attempts": 5,
     "ensure": False,
     "cleanup": False,
     "synchronous": False,
+    "python": False,
 }
 
-SYSTEM_PROMPT = """
+COMMAND_SYSTEM_PROMPT = """
+You are an expert system administrator tasked with creating shell commands to fulfill user instructions.
+Your commands should be concise, use appropriate flags/options, and handle paths and special characters safely.
+
+Focus on:
+- Using the most appropriate command-line tools for each task
+- Platform-specific considerations (Windows vs Unix)
+- Proper error handling and user feedback
+- Security best practices
+- You cannot use `sudo`
+"""
+
+PYTHON_SYSTEM_PROMPT = """
 You are an expert Python developer tasked with writing scripts to fulfill user instructions.
 Your scripts should be concise, use modern Python idioms, and leverage appropriate libraries.
 
@@ -97,11 +111,50 @@ class ScriptResult(BaseModel):
     i_have_seen_the_last_terminal_output: bool = False
 
 
+class CommandResult(BaseModel):
+    """Model for LLM response structure"""
+
+    terminal_command_or_shell_script: str
+    message_to_user: str
+    the_goal_was_attained: bool = False
+    i_have_seen_the_last_terminal_output: bool = False
+
+
 def stream_output(process, output_queue):
     """Stream output from a subprocess to a queue"""
     for line in iter(process.stdout.readline, ""):
         output_queue.put(line)
     process.stdout.close()
+
+
+def run_command(command: str, verbose: bool) -> tuple[str, int]:
+    """Run the given command and return the output"""
+    with Status("[bold blue]Running command...", console=console):
+        process = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True,
+        )
+
+        # Collect output while streaming it
+        output_lines = []
+        while True:
+            line = process.stdout.readline()
+            if not line and process.poll() is not None:
+                break
+            if line:
+                output_lines.append(line)
+                if verbose:
+                    console.print(line.rstrip())
+
+        process.stdout.close()
+        return_code = process.wait()
+
+        return "".join(output_lines).strip(), return_code
 
 
 def run_script(script: str, cleanup: bool, verbose: bool) -> tuple[str, int, str]:
@@ -145,10 +198,18 @@ def run_script(script: str, cleanup: bool, verbose: bool) -> tuple[str, int, str
             os.unlink(script_path)
 
 
+def get_shell_info():
+    """Get information about the current shell environment"""
+    if platform.system() == "Windows":
+        shell = os.environ.get("COMSPEC", "cmd.exe")
+        return "cmd.exe" if "cmd.exe" in shell.lower() else "powershell"
+    return os.environ.get("SHELL", "bash").split("/")[-1]
+
+
 @click.command()
 @click.argument("instructions", nargs=-1, required=False)
 @click.option(
-    "--control",
+    "--confirm",
     "-c",
     is_flag=True,
     help="Prompt for permission before each execution",
@@ -206,10 +267,16 @@ def run_script(script: str, cleanup: bool, verbose: bool) -> tuple[str, int, str
     is_flag=True,
     help="If true, the program will NOT stream the output of the script. It will run synchronously.",
 )
+@click.option(
+    "--python",
+    "-p",
+    is_flag=True,
+    help="If true, the program will use Python to satisfy your instructions.",
+)
 @click.version_option(version=__version__)
 def main(
     instructions: tuple,
-    control: bool,
+    confirm: bool,
     model: Optional[str],
     api_key: Optional[str],
     attempts: int,
@@ -219,6 +286,7 @@ def main(
     namespace: str,
     verbose: bool,
     synchronous: bool,
+    python: bool,
 ):
     """Describe what you want done, and Skeet will use AI to make it happen."""
 
@@ -241,7 +309,7 @@ def main(
 
     model = model or config.get("model", DEFAULT_VALUES["model"])
     api_key = api_key or config.get("api_key", DEFAULT_VALUES["api_key"])
-    control = control or config.get("control", DEFAULT_VALUES["control"])
+    confirm = confirm or config.get("confirm", DEFAULT_VALUES["confirm"])
     attempts = attempts or config.get("attempts", DEFAULT_VALUES["attempts"])
     ensure = ensure or config.get("ensure", DEFAULT_VALUES["ensure"])
     cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
@@ -249,35 +317,80 @@ def main(
     synchronous = (
         synchronous
         or ensure
+        or (not python)
         or config.get("synchronous", DEFAULT_VALUES["synchronous"])
     )
+    python = python or config.get("python", DEFAULT_VALUES["python"])
 
     if verbose:
         pprint(
             {
                 "model": model,
                 "api_key": api_key[:5] + "..." + api_key[-5:] if api_key else None,
-                "control": control,
+                "confirm": confirm,
                 "attempts": attempts,
                 "ensure": ensure,
                 "cleanup": cleanup,
                 "synchronous": synchronous,
+                "python": python,
             }
         )
 
     @llm(
-        system=SYSTEM_PROMPT,
+        system=COMMAND_SYSTEM_PROMPT,
+        memory=True,
+        model=model,
+        stream=not synchronous,
+        json_schema=CommandResult.model_json_schema() if ensure else None,
+    )
+    def get_or_analyze_command(
+        goal: str,
+        last_terminal_output: str = "",
+        platform: str = platform.platform(),
+        shell: str = get_shell_info(),
+    ):
+        """
+        Create or modify an appropriate terminal command or shell script based on the goal, previous output, platform, and shell.
+
+        If the goal is to be satisfied, the terminal command or shell script must return a zero exit code. For example, if the goal is 'what is using port 8000', account for when the port is not being used like so: 'lsof -i :8000 || echo "port 8000 is not being used"'
+
+        Do not include exposition or commentary.
+
+        Goal: '{goal}'
+        Last Output: ```{last_terminal_output}```
+        Platform: {platform}
+        Shell: {shell}
+        """
+
+    ensure_instructions = """
+        Return the terminal command along with whether you have seen the last terminal output, the goal was attained, and a message to the user.
+
+        If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
+        If the goal was attained and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
+    """
+
+    if ensure:
+        get_or_analyze_command.__doc__ += os.linesep + ensure_instructions
+    if not synchronous:
+        get_or_analyze_command.__doc__ += (
+            os.linesep
+            + f"Enclose the command in triple backticks with {get_shell_info()} as the shell."
+        )
+
+    @llm(
+        system=PYTHON_SYSTEM_PROMPT,
         memory=True,
         model=model,
         stream=not synchronous,
         json_schema=ScriptResult.model_json_schema() if ensure else None,
     )
-    def invoke_llm(
+    def get_or_analyze_python_script(
         goal: str,
         last_terminal_output: str = "",
         platform: str = platform.platform(),
     ):
-        """Create or modify a Python script based on the goal, previous output, and platform.
+        """
+        Create or modify a Python script based on the goal, previous output, and platform. Focus on the script -- avoid unnecessary exposition or commentary.
 
         If last_terminal_output is provided, analyze it for errors and make necessary corrections.
 
@@ -294,9 +407,12 @@ def main(
     """
 
     if ensure:
-        invoke_llm.__doc__ += os.linesep + ensure_instructions
+        get_or_analyze_python_script.__doc__ += os.linesep + ensure_instructions
     if not synchronous:
-        invoke_llm.__doc__ += os.linesep + "Enclose the script in triple backticks with python as the language."
+        get_or_analyze_python_script.__doc__ += (
+            os.linesep
+            + "Enclose the script in triple backticks with python as the language."
+        )
 
     if api_key:
         litellm.api_key = api_key
@@ -316,8 +432,13 @@ def main(
         if return_code == 0 and not ensure:
             return
 
-        def execute_llm() -> dict | str:
-            invocation = invoke_llm(instruction_text, last_output)
+        def execute_llm(mode: Literal["python", "command"], instruction_text=instruction_text) -> dict | str:
+            if mode == "python":
+                invocation = get_or_analyze_python_script(instruction_text, last_output)
+            else:
+                invocation = get_or_analyze_command(
+                    instruction_text if "sudo" not in instruction_text else "YOU CANNOT USE SUDO",
+                    last_output)
 
             if synchronous:
                 return invocation
@@ -332,32 +453,60 @@ def main(
 
         if ensure:
             with Status("[bold yellow]Communicating with LLM...", console=console):
-                result = ScriptResult(**execute_llm())
+                result = (
+                    ScriptResult(**execute_llm("python"))
+                    if python
+                    else CommandResult(**execute_llm("command"))
+                )
         else:
             if synchronous:
                 with Status("[bold yellow]Communicating with LLM...", console=console):
-                    result_string = execute_llm()
+                    result_string = (
+                        execute_llm("python") if python else execute_llm("command")
+                    )
             else:
-                result_string = execute_llm()
-
-            try:
-                script = re.search(
-                    r"```python\n(.*?)```", result_string, re.DOTALL
-                ).group(1)
-            except AttributeError:
-                console.print("[yellow]Failed to extract script from output.[/yellow]")
-                console.print(
-                    Panel(result_string, title="LLM Output", border_style="yellow")
+                result_string = (
+                    execute_llm("python") if python else execute_llm("command")
                 )
-                # assume the script is the result_string
-                script = result_string
 
-            result = ScriptResult(
-                script=script,
-                message_to_user="",
-                the_goal_was_attained=False,
-                i_have_seen_the_last_terminal_output=False,
-            )
+            if python:
+
+                try:
+                    script = re.search(
+                        r"```python\n(.*?)```", result_string, re.DOTALL
+                    ).group(1)
+                except AttributeError:
+                    console.print(
+                        "[yellow]Failed to extract script from output.[/yellow]"
+                    )
+                    console.print(
+                        Panel(result_string, title="LLM Output", border_style="yellow")
+                    )
+                    # assume the script is the result_string
+                    script = result_string
+
+                result = ScriptResult(
+                    script=script,
+                    message_to_user="",
+                    the_goal_was_attained=False,
+                    i_have_seen_the_last_terminal_output=False,
+                )
+
+            else:
+                try:
+                    terminal_command = re.search(
+                        r"```(?:\w+)?\n(.*?)```", result_string, re.DOTALL
+                    ).group(1)
+                except AttributeError:
+                    # assume the script is the result_string
+                    terminal_command = result_string
+
+                result = CommandResult(
+                    terminal_command_or_shell_script=terminal_command,
+                    message_to_user="",
+                    the_goal_was_attained=False,
+                    i_have_seen_the_last_terminal_output=False,
+                )
 
         if iteration == attempts:
             console.print("[red]Maximum iterations reached without success[/red]")
@@ -368,7 +517,7 @@ def main(
                 Panel(
                     last_output,
                     title="Script Output",
-                    subtitle=script_path if not cleanup else "",
+                    subtitle=script_path if python and not cleanup else "",
                     border_style="green" if return_code == 0 else "red",
                 )
             )
@@ -386,12 +535,15 @@ def main(
             return
 
         if synchronous:
-            console.print(Panel(Syntax(result.script, "python"), title="Script"))
+            if python:
+                console.print(Panel(Syntax(result.script, "python"), title="Script"))
+            else:
+                console.print(Panel(Syntax(result.terminal_command_or_shell_script, get_shell_info()), title="Command"))
 
-        if control:
+        if confirm:
             changes = click.prompt(
                 os.linesep
-                + "What changes would you like to make to the script? Hit Enter to run without changes.",
+                + "What changes would you like to make? Hit Enter to run without changes.",
                 type=str,
                 default="",
             )
@@ -399,7 +551,12 @@ def main(
                 instruction_text = changes
                 continue
 
-        last_output, return_code, script_path = run_script(result.script, cleanup, verbose)
+        if python:
+            last_output, return_code, script_path = run_script(
+                result.script, cleanup, verbose
+            )
+        else:
+            last_output, return_code = run_command(result.terminal_command_or_shell_script, verbose)
 
         if result.message_to_user and synchronous:
             console.print(Panel(result.message_to_user, title="LLM"))
