@@ -3,7 +3,9 @@
 🧞 <i>Skeet</i> - <i>Skeet</i> is like a genie that lives in your terminal. Tell it what you want, and <i>Skeet</i> will make your wishes come true. 💫
 </h3> 
 
-![skeet](https://github.com/user-attachments/assets/0d0e153e-fb64-47f4-908b-ac0388206c38)
+![skeet](https://github.com/user-attachments/assets/e4253aa6-3069-47bf-a7be-7da5bcf79413)
+
+
 
 🔥 Think of _Skeet_ as [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) on steroids. It won't give up on the first try and works with practically any LLM provider, putting you in full control of your terminal.
 
@@ -96,4 +98,4 @@ If no namespace is specified, the `default` one will be used.
 4. Skeet executes the command or script
 5. If the execution fails or doesn't achieve the goal, Skeet can retry with improvements based on the error output
 
-[![asciicast](https://asciinema.org/a/697033.svg)](https://asciinema.org/a/697033)
+[![asciicast](https://asciinema.org/a/697092.svg)](https://asciinema.org/a/697092)
