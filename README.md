@@ -50,7 +50,7 @@ default: # Default namespace
   api_key: "sk-..." # Your LLM API key
   confirm: false # Whether to prompt for permission before each execution
   attempts: 5 # Maximum number of execution attempts
-  ensure: false # Whether to verify output with LLM
+  verify: false # Whether to verify output with LLM
   cleanup: false # Whether to clean up temporary files
   synchronous: false # Whether to run in synchronous mode
   python: false # Whether to use Python scripts instead of shell commands
