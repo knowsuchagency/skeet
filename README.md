@@ -18,9 +18,6 @@ skeet what is using port 8000
 skeet "what's the total size of ~/Downloads?"
 ```
 
-[![asciicast](https://asciinema.org/a/697025.svg)](https://asciinema.org/a/697025)
-
-
 ## Installation
 
 The recommended installation method is [uv](https://github.com/astral-sh/uv).
@@ -86,3 +83,7 @@ If no namespace is specified, the `default` configuration will be used.
 - Error handling and automatic retry
 - Configurable LLM models
 - Rich terminal output with syntax highlighting
+
+## Demo
+
+[![asciicast](https://asciinema.org/a/697025.svg)](https://asciinema.org/a/697025)

@@ -21,7 +21,7 @@ from rich.pretty import pprint
 from rich.syntax import Syntax
 from ruamel.yaml import YAML
 
-__version__ = "0.7.3"
+__version__ = "0.7.4"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
