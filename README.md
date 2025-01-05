@@ -11,6 +11,8 @@ Skeet works by leveraging [promptic](https://github.com/knowsuchagency/promptic)
 
 ## Examples
 
+<script src="https://asciinema.org/a/697023.js" id="asciicast-697023" async="true"></script>
+
 ```bash
 
 skeet show me system information about this computer
