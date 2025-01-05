@@ -46,7 +46,7 @@ There aren't any keys that are required for a given namespace, but `model` and `
 default: # Default namespace
   model: "gpt-4o" # Default LLM model to use
   api_key: "sk-..." # Your LLM API key
-  control: false # Whether to prompt for permission before each execution
+  confirm: false # Whether to prompt for permission before each execution
   attempts: 5 # Maximum number of script execution attempts
   ensure: false # Whether to verify script output with LLM
   cleanup: false # Whether to clean up temporary files

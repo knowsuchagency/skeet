@@ -26,7 +26,7 @@ __version__ = "0.7.9"
 DEFAULT_VALUES = {
     "model": "gpt-4o",
     "api_key": None,
-    "control": False,
+    "confirm": False,
     "attempts": 5,
     "ensure": False,
     "cleanup": False,
@@ -148,7 +148,7 @@ def run_script(script: str, cleanup: bool, verbose: bool) -> tuple[str, int, str
 @click.command()
 @click.argument("instructions", nargs=-1, required=False)
 @click.option(
-    "--control",
+    "--confirm",
     "-c",
     is_flag=True,
     help="Prompt for permission before each execution",
@@ -209,7 +209,7 @@ def run_script(script: str, cleanup: bool, verbose: bool) -> tuple[str, int, str
 @click.version_option(version=__version__)
 def main(
     instructions: tuple,
-    control: bool,
+    confirm: bool,
     model: Optional[str],
     api_key: Optional[str],
     attempts: int,
@@ -241,7 +241,7 @@ def main(
 
     model = model or config.get("model", DEFAULT_VALUES["model"])
     api_key = api_key or config.get("api_key", DEFAULT_VALUES["api_key"])
-    control = control or config.get("control", DEFAULT_VALUES["control"])
+    confirm = confirm or config.get("confirm", DEFAULT_VALUES["confirm"])
     attempts = attempts or config.get("attempts", DEFAULT_VALUES["attempts"])
     ensure = ensure or config.get("ensure", DEFAULT_VALUES["ensure"])
     cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
@@ -257,7 +257,7 @@ def main(
             {
                 "model": model,
                 "api_key": api_key[:5] + "..." + api_key[-5:] if api_key else None,
-                "control": control,
+                "confirm": confirm,
                 "attempts": attempts,
                 "ensure": ensure,
                 "cleanup": cleanup,
@@ -388,7 +388,7 @@ def main(
         if synchronous:
             console.print(Panel(Syntax(result.script, "python"), title="Script"))
 
-        if control:
+        if confirm:
             changes = click.prompt(
                 os.linesep
                 + "What changes would you like to make to the script? Hit Enter to run without changes.",
