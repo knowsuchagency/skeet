@@ -19,7 +19,7 @@ skeet "what's the total size of ~/Downloads?"
 
 # Python scripts (using -p or --python flag)
 skeet --python convert all html files in the current directory to pdf
-skeet -p "how many stars does https://github.com/knowsuchagency/promptic have?"
+skeet -p "how many stars for https://github.com/knowsuchagency/promptic?"
 ```
 
 ## Installation
