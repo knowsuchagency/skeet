@@ -1,15 +1,14 @@
 # 🦅 Skeet 🎯
 
-Describe what you want done, and *Skeet* will make it happen.
+Describe what you want done, and _Skeet_ will make it happen.
 
-Like a skilled skeet shooter, *Skeet* takes your terminal commands and targets them with precision through AI. 
+Like a skilled skeet shooter, _Skeet_ takes your terminal commands and targets them with precision through AI.
 
-*Skeet* works by using [promptic](https://github.com/knowsuchagency/promptic) to generate Python scripts and `uv` to execute them. Through [uv scripts](https://docs.astral.sh/uv/guides/scripts/), *Skeet* can use third-party libraries without virtual environments.
-
+_Skeet_ works by using [promptic](https://github.com/knowsuchagency/promptic) to generate Python scripts and `uv` to execute them. Through [uv scripts](https://docs.astral.sh/uv/guides/scripts/), _Skeet_ can use third-party libraries without virtual environments.
 
 ## Examples
 
-![skeet](https://github.com/user-attachments/assets/aee1e53c-9440-4aac-b89c-75d1df9fd692)
+[![asciicast](https://asciinema.org/a/697025.svg)](https://asciinema.org/a/697025)
 
 ```bash
 
@@ -30,21 +29,42 @@ The recommended installation method is [uv](https://github.com/astral-sh/uv).
 uv tool install skeet
 ```
 
-
 ## Configuration
 
-Skeet can be configured using a YAML file at `~/.config/skeet/config.yaml`.
+Skeet can be configured using a YAML file at `~/.config/skeet/config.yaml`. The configuration now supports multiple namespaces for different LLM providers and configurations.
 
-None of the options are required, but `model` and `api_key` are recommended.
+There aren't any keys that are required for a given namespace, but model and api_key are recommended.
 
 ```yaml
-model: "gpt-4o" # Default LLM model to use
-api_key: "sk-..." # Your LLM API key
-control: false # Whether to prompt for permission before each execution
-attempts: 5 # Maximum number of script execution attempts
-ensure: false # Whether to verify script output with LLM
-no_loop: false # Whether to run only once without retrying
+default: # Default namespace
+  model: "gpt-4o" # Default LLM model to use
+  api_key: "sk-..." # Your LLM API key
+  control: false # Whether to prompt for permission before each execution
+  attempts: 5 # Maximum number of script execution attempts
+  ensure: false # Whether to verify script output with LLM
+  cleanup: false # Whether to clean up temporary files
+  synchronous: false # Whether to run in synchronous mode
+
+openai: # OpenAI-specific configuration
+  model: "o1-mini"
+  api_key: "sk-..."
+
+anthropic: # Anthropic-specific configuration
+  model: "claude-3-sonnet"
+  api_key: "sk-..."
+
+ollama: # Local Ollama configuration
+  model: "ollama_chat/phi3:medium"
 ```
+
+You can specify which configuration to use with the `--namespace` or `-n` flag:
+
+```bash
+skeet -n anthropic "what's the weather like?"
+skeet --namespace openai "list files in the current directory"
+```
+
+If no namespace is specified, the `default` configuration will be used.
 
 ## How it Works
 
@@ -54,7 +74,6 @@ no_loop: false # Whether to run only once without retrying
 4. Skeet executes the script using `uv run`
 5. If the script fails or doesn't achieve the goal, Skeet can retry with improvements based on the error output
 
-
 ## Features
 
 - Natural language to Python script conversion
@@ -63,5 +82,3 @@ no_loop: false # Whether to run only once without retrying
 - Error handling and automatic retry
 - Configurable LLM models
 - Rich terminal output with syntax highlighting
-
-[![asciicast](https://asciinema.org/a/697023.svg)](https://asciinema.org/a/697023)

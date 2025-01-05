@@ -29,7 +29,6 @@ DEFAULT_VALUES = {
     "control": False,
     "attempts": 5,
     "ensure": False,
-    "no_loop": False,
     "cleanup": False,
     "synchronous": False,
 }
@@ -39,7 +38,6 @@ You are an expert Python developer tasked with writing scripts to fulfill user i
 Your scripts should be concise, use modern Python idioms, and leverage appropriate libraries.
 
 Key guidelines:
-- Enclose the script in triple backticks with python as the language
 - Return complete, runnable Python scripts that use the necessary imports
 - Prefer standard library solutions when appropriate
 - Scripts should be self-contained and handle their own dependencies via uv
@@ -106,7 +104,7 @@ def stream_output(process, output_queue):
     process.stdout.close()
 
 
-def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
+def run_script(script: str, cleanup: bool, verbose: bool) -> tuple[str, int, str]:
     """Run the given script using uv and return the output"""
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
@@ -133,7 +131,8 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
                     break
                 if line:
                     output_lines.append(line)
-                    console.print(line.rstrip())
+                    if verbose:
+                        console.print(line.rstrip())
 
             process.stdout.close()
             return_code = process.wait()
@@ -178,12 +177,6 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
     help="If true, the llm will check the output of the script and determine if the goal was met. By default, the program will terminate if the script returns a zero exit code.",
 )
 @click.option(
-    "--no-loop",
-    "-o",
-    is_flag=True,
-    help="If true, the program will not loop and will only run once. By default, the program will keep running until the instructions are satisfied.",
-)
-@click.option(
     "--cleanup",
     "-x",
     is_flag=True,
@@ -221,7 +214,6 @@ def main(
     api_key: Optional[str],
     attempts: int,
     ensure: bool,
-    no_loop: bool,
     cleanup: bool,
     upgrade: bool,
     namespace: str,
@@ -252,7 +244,6 @@ def main(
     control = control or config.get("control", DEFAULT_VALUES["control"])
     attempts = attempts or config.get("attempts", DEFAULT_VALUES["attempts"])
     ensure = ensure or config.get("ensure", DEFAULT_VALUES["ensure"])
-    no_loop = no_loop or config.get("no_loop", DEFAULT_VALUES["no_loop"])
     cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
     # if ensure is true, then we will run synchronously
     synchronous = (
@@ -265,11 +256,10 @@ def main(
         pprint(
             {
                 "model": model,
-                "api_key": api_key[:5] + "..." + api_key[-5:],
+                "api_key": api_key[:5] + "..." + api_key[-5:] if api_key else None,
                 "control": control,
                 "attempts": attempts,
                 "ensure": ensure,
-                "no_loop": no_loop,
                 "cleanup": cleanup,
                 "synchronous": synchronous,
             }
@@ -305,6 +295,8 @@ def main(
 
     if ensure:
         invoke_llm.__doc__ += os.linesep + ensure_instructions
+    if not synchronous:
+        invoke_llm.__doc__ += os.linesep + "Enclose the script in triple backticks with python as the language."
 
     if api_key:
         litellm.api_key = api_key
@@ -324,7 +316,7 @@ def main(
         if return_code == 0 and not ensure:
             return
 
-        def execute_llm():
+        def execute_llm() -> dict | str:
             invocation = invoke_llm(instruction_text, last_output)
 
             if synchronous:
@@ -335,6 +327,7 @@ def main(
                 if verbose or not ensure:
                     console.print(chunk, end="")
                 result += chunk
+            print()
             return result
 
         if ensure:
@@ -352,11 +345,12 @@ def main(
                     r"```python\n(.*?)```", result_string, re.DOTALL
                 ).group(1)
             except AttributeError:
-                console.print("[red]Failed to extract script from output.[/red]")
+                console.print("[yellow]Failed to extract script from output.[/yellow]")
                 console.print(
-                    Panel(result_string, title="LLM Output", border_style="red")
+                    Panel(result_string, title="LLM Output", border_style="yellow")
                 )
-                return
+                # assume the script is the result_string
+                script = result_string
 
             result = ScriptResult(
                 script=script,
@@ -405,16 +399,13 @@ def main(
                 instruction_text = changes
                 continue
 
-        last_output, return_code, script_path = run_script(result.script, cleanup)
+        last_output, return_code, script_path = run_script(result.script, cleanup, verbose)
 
         if result.message_to_user and synchronous:
             console.print(Panel(result.message_to_user, title="LLM"))
 
         if not ensure:
             display_result()
-
-        if no_loop:
-            break
 
 
 if __name__ == "__main__":
