@@ -1,12 +1,16 @@
-# Skeet 🎯
 
-Master your machine: If you know English, _Skeet_ makes you a terminal wizard.
+<h3 align="center">
+🧙‍♂️ <i>Skeet</i> - Master your machine: If you know English, <i>Skeet</i> makes you a command-line wizard.
+</h3>
 
-Like a skilled marksman who keeps shooting until they hit their target, _Skeet_ transforms your natural language instructions into precise shell commands or Python scripts, adapting and retrying automatically until the job is done.
+![skeet](https://github.com/user-attachments/assets/0d0e153e-fb64-47f4-908b-ac0388206c38)
 
-Built on [promptic](https://github.com/knowsuchagency/promptic) and powered by [uv](https://github.com/astral-sh/uv), _Skeet_ can execute Python scripts with access to third-party libraries—no virtual environments needed. When a command fails, _Skeet_ analyzes the output and adjusts its approach, ensuring your goals are met.
 
-_Skeet_ supports any LLM provider available through [LiteLLM](https://docs.litellm.ai/docs/providers), including OpenAI, Anthropic, Azure, local models, and many more!
+🎯 Like a skilled marksman who keeps shooting until they hit their target, _Skeet_ transforms your natural language instructions into precise shell commands or Python scripts, adapting and retrying automatically until the job is done.
+
+🤖 Built on [promptic](https://github.com/knowsuchagency/promptic) and powered by [uv](https://github.com/astral-sh/uv), _Skeet_ can execute Python scripts with access to third-party libraries—no virtual environments needed. When a command fails, _Skeet_ analyzes the output and adjusts its approach, ensuring your goals are met.
+
+⭐ _Skeet_ supports any LLM provider available through [LiteLLM](https://docs.litellm.ai/docs/providers), including OpenAI, Anthropic, Azure, local models, and many more!
 
 ## Examples
 
@@ -20,8 +24,6 @@ skeet "what's size of my downloads folder?"
 skeet --python convert all html files in the current directory to pdf
 skeet -p "how many stars for https://github.com/knowsuchagency/promptic?"
 ```
-
-![skeet](https://github.com/user-attachments/assets/0d0e153e-fb64-47f4-908b-ac0388206c38)
 
 ## Installation
 
@@ -94,4 +96,3 @@ If no namespace is specified, the `default` one will be used.
 - Rich terminal output with syntax highlighting
 
 [![asciicast](https://asciinema.org/a/697033.svg)](https://asciinema.org/a/697033)
-
