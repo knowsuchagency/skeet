@@ -21,9 +21,7 @@ skeet --python convert all html files in the current directory to pdf
 skeet -p "how many stars for https://github.com/knowsuchagency/promptic?"
 ```
 
-### Demo
-
-[![asciicast](https://asciinema.org/a/697033.svg)](https://asciinema.org/a/697033)
+![skeet](https://github.com/user-attachments/assets/0d0e153e-fb64-47f4-908b-ac0388206c38)
 
 ## Installation
 
@@ -94,3 +92,6 @@ If no namespace is specified, the `default` one will be used.
 - Error handling and automatic retry
 - Configurable LLM models
 - Rich terminal output with syntax highlighting
+
+[![asciicast](https://asciinema.org/a/697033.svg)](https://asciinema.org/a/697033)
+
