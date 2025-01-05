@@ -22,14 +22,14 @@ from rich.pretty import pprint
 from rich.syntax import Syntax
 from ruamel.yaml import YAML
 
-__version__ = "0.8.1"
+__version__ = "0.9.0"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
     "api_key": None,
     "confirm": False,
     "attempts": 5,
-    "ensure": False,
+    "verify": False,
     "cleanup": False,
     "synchronous": False,
     "python": False,
@@ -232,10 +232,10 @@ def get_shell_info():
     help="Maximum number of script execution attempts. If less than 0, the program will loop until the script is successful, regardless of errors.",
 )
 @click.option(
-    "--ensure",
+    "--verify",
     "-e",
     is_flag=True,
-    help="If true, the llm will check the output of the script and determine if the goal was met. By default, the program will terminate if the script returns a zero exit code.",
+    help="If true, the llm will verify the goal was met after commands or scripts are run. By default, the program will terminate if the script or command returns a zero exit code.",
 )
 @click.option(
     "--cleanup",
@@ -280,7 +280,7 @@ def main(
     model: Optional[str],
     api_key: Optional[str],
     attempts: int,
-    ensure: bool,
+    verify: bool,
     cleanup: bool,
     upgrade: bool,
     namespace: str,
@@ -311,12 +311,12 @@ def main(
     api_key = api_key or config.get("api_key", DEFAULT_VALUES["api_key"])
     confirm = confirm or config.get("confirm", DEFAULT_VALUES["confirm"])
     attempts = attempts or config.get("attempts", DEFAULT_VALUES["attempts"])
-    ensure = ensure or config.get("ensure", DEFAULT_VALUES["ensure"])
+    verify = verify or config.get("ensure", DEFAULT_VALUES["verify"])
     cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
-    # if ensure is true, then we will run synchronously
+    # if verify is true, then we will run synchronously
     synchronous = (
         synchronous
-        or ensure
+        or verify
         or (not python)
         or config.get("synchronous", DEFAULT_VALUES["synchronous"])
     )
@@ -329,7 +329,7 @@ def main(
                 "api_key": api_key[:5] + "..." + api_key[-5:] if api_key else None,
                 "confirm": confirm,
                 "attempts": attempts,
-                "ensure": ensure,
+                "verify": verify,
                 "cleanup": cleanup,
                 "synchronous": synchronous,
                 "python": python,
@@ -341,7 +341,7 @@ def main(
         memory=True,
         model=model,
         stream=not synchronous,
-        json_schema=CommandResult.model_json_schema() if ensure else None,
+        json_schema=CommandResult.model_json_schema() if verify else None,
     )
     def get_or_analyze_command(
         goal: str,
@@ -362,15 +362,15 @@ def main(
         Shell: {shell}
         """
 
-    ensure_instructions = """
+    verify_instructions = """
         Return the terminal command along with whether you have seen the last terminal output, the goal was attained, and a message to the user.
 
         If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
         If the goal was attained and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
     """
 
-    if ensure:
-        get_or_analyze_command.__doc__ += os.linesep + ensure_instructions
+    if verify:
+        get_or_analyze_command.__doc__ += os.linesep + verify_instructions
     if not synchronous:
         get_or_analyze_command.__doc__ += (
             os.linesep
@@ -382,7 +382,7 @@ def main(
         memory=True,
         model=model,
         stream=not synchronous,
-        json_schema=ScriptResult.model_json_schema() if ensure else None,
+        json_schema=ScriptResult.model_json_schema() if verify else None,
     )
     def get_or_analyze_python_script(
         goal: str,
@@ -399,15 +399,15 @@ def main(
         Platform: {platform}
         """
 
-    ensure_instructions = """
+    verify_instructions = """
         Return the script along with whether you have seen the last terminal output, the goal was attained, and a message to the user.
 
         If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
         If the goal was attained and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
     """
 
-    if ensure:
-        get_or_analyze_python_script.__doc__ += os.linesep + ensure_instructions
+    if verify:
+        get_or_analyze_python_script.__doc__ += os.linesep + verify_instructions
     if not synchronous:
         get_or_analyze_python_script.__doc__ += (
             os.linesep
@@ -429,7 +429,7 @@ def main(
         if verbose:
             pprint({"iteration": iteration, "return_code": return_code})
 
-        if return_code == 0 and not ensure:
+        if return_code == 0 and not verify:
             return
 
         def execute_llm(mode: Literal["python", "command"], instruction_text=instruction_text) -> dict | str:
@@ -445,13 +445,13 @@ def main(
 
             result = ""
             for chunk in invocation:
-                if verbose or not ensure:
+                if verbose or not verify:
                     console.print(chunk, end="")
                 result += chunk
             print()
             return result
 
-        if ensure:
+        if verify:
             with Status("[bold yellow]Communicating with LLM...", console=console):
                 result = (
                     ScriptResult(**execute_llm("python"))
@@ -530,7 +530,7 @@ def main(
                 return_code == 0,
             ]
         ):
-            if ensure:
+            if verify:
                 display_result()
             return
 
@@ -561,7 +561,7 @@ def main(
         if result.message_to_user and synchronous:
             console.print(Panel(result.message_to_user, title="LLM"))
 
-        if not ensure:
+        if not verify:
             display_result()
 
 
