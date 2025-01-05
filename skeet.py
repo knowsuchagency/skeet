@@ -21,7 +21,7 @@ from rich.pretty import pprint
 from rich.syntax import Syntax
 from ruamel.yaml import YAML
 
-__version__ = "0.6.3"
+__version__ = "0.7.0"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
@@ -114,17 +114,31 @@ def run_script(script: str, cleanup: bool) -> tuple[str, int, str]:
         script_path = f.name
 
     try:
-        with Status("[bold blue]Running script...", console=console) as status:
-            # Run script using uv and capture output
-            process = subprocess.run(
+        with Status("[bold blue]Running script...", console=console):
+            # Use Popen to stream output in real-time
+            process = subprocess.Popen(
                 ["uv", "run", "-q", script_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                check=False,
+                bufsize=1,
+                universal_newlines=True,
             )
 
-            return process.stdout.strip() or "", process.returncode, script_path
+            # Collect output while streaming it
+            output_lines = []
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                if line:
+                    output_lines.append(line)
+                    console.print(line.rstrip())
+
+            process.stdout.close()
+            return_code = process.wait()
+
+            return "".join(output_lines).strip(), return_code, script_path
 
     finally:
         if cleanup:
@@ -241,7 +255,11 @@ def main(
     no_loop = no_loop or config.get("no_loop", DEFAULT_VALUES["no_loop"])
     cleanup = cleanup or config.get("cleanup", DEFAULT_VALUES["cleanup"])
     # if ensure is true, then we will run synchronously
-    synchronous = synchronous or ensure or config.get("synchronous", DEFAULT_VALUES["synchronous"])
+    synchronous = (
+        synchronous
+        or ensure
+        or config.get("synchronous", DEFAULT_VALUES["synchronous"])
+    )
 
     if verbose:
         pprint(
@@ -272,7 +290,7 @@ def main(
         """Create or modify a Python script based on the goal, previous output, and platform.
 
         If last_terminal_output is provided, analyze it for errors and make necessary corrections.
-        
+
         Goal: '{goal}'
         Last Output: ```{last_terminal_output}```
         Platform: {platform}
@@ -311,7 +329,7 @@ def main(
 
             if synchronous:
                 return invocation
-            
+
             result = ""
             for chunk in invocation:
                 if verbose or not ensure:
