@@ -56,6 +56,7 @@ default: # Default namespace
   cleanup: false # Whether to clean up temporary files
   synchronous: false # Whether to run in synchronous mode
   python: false # Whether to use Python scripts instead of shell commands
+  litellm_kwargs: # Extra arguments to pass to LiteLLM
 
 openai: # OpenAI-specific configuration
   model: "o1-mini"
