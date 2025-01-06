@@ -1005,7 +1005,7 @@ wheels = [
 
 [[package]]
 name = "skeet"
-version = "0.6.2"
+version = "2.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

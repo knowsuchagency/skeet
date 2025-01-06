@@ -6,7 +6,7 @@
 ![skeet](https://github.com/user-attachments/assets/e4253aa6-3069-47bf-a7be-7da5bcf79413)
 
 
-🔥 Think of _Skeet_ as [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) on steroids. It won't give up on the first try and works with practically any LLM provider, putting you in full control of your terminal.
+🔥 Think of _Skeet_ as [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) on steroids. It won't just give up on the first try and works with almost any LLM provider, putting you in full control of your terminal.
 
 🎯 Like a skilled marksman who keeps shooting until they hit their target, _Skeet_ transforms your natural language instructions into precise shell commands or Python scripts, adapting and retrying automatically until the job is done.
 
@@ -64,6 +64,10 @@ openai: # OpenAI-specific configuration
 
 anthropic: # Anthropic-specific configuration
   model: "claude-3-5-sonnet-20240620"
+  api_key: "sk-..."
+
+google: # Google-specific configuration
+  model: "openrouter/google/gemini-pro-1.5"
   api_key: "sk-..."
 
 ollama: # Local Ollama configuration
