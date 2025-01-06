@@ -1,6 +1,6 @@
 
 <h3 align="center">
-🧞 <i>Skeet</i> - <i>Skeet</i> is like a genie that lives in your terminal. Tell it what you want, and <i>Skeet</i> makes your wishes come true. 💫
+🧙‍♂️ Never look up a terminal command again.<br>With <b><i style="color: green">Skeet</i></b>, you're a command-line wizard. 🪄
 </h3> 
 
 ![skeet](https://github.com/user-attachments/assets/e4253aa6-3069-47bf-a7be-7da5bcf79413)

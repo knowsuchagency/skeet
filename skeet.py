@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from rich.prompt import Prompt
 from ruamel.yaml import YAML
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
