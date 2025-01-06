@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from rich.prompt import Prompt
 from ruamel.yaml import YAML
 
-__version__ = "2.0.1"
+__version__ = "2.1.0"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
@@ -320,6 +320,7 @@ def main(
         or config.get("synchronous", DEFAULT_VALUES["synchronous"])
     )
     python = python or config.get("python", DEFAULT_VALUES["python"])
+    litellm_kwargs = config.get("litellm_kwargs", {})
 
     if interactive and not attempts < 0:
         if verbose:
@@ -339,6 +340,7 @@ def main(
                 "cleanup": cleanup,
                 "synchronous": synchronous,
                 "python": python,
+                "litellm_kwargs": litellm_kwargs,
             }
         )
 
@@ -348,6 +350,7 @@ def main(
         model=model,
         stream=not synchronous,
         json_schema=Result.model_json_schema() if verify else None,
+        **litellm_kwargs,
     )
     def get_or_analyze_command(
         query: str,
@@ -389,6 +392,7 @@ def main(
         model=model,
         stream=not synchronous,
         json_schema=Result.model_json_schema() if verify else None,
+        **litellm_kwargs,
     )
     def get_or_analyze_python_script(
         query: str,
