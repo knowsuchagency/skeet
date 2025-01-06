@@ -1,6 +1,6 @@
 
 <h3 align="center">
-🧙‍♂️ Never look up a terminal command again.<br>With <b><i style="color: green">Skeet</i></b>, you're a command-line wizard. 🪄
+🎯 Skeet: The command-line AI copilot for power users <br>Resilient. Model-agnostic. Local-friendly.<br>A Swiss Army Knife for your terminal 🛠️
 </h3> 
 
 ![skeet](https://github.com/user-attachments/assets/e4253aa6-3069-47bf-a7be-7da5bcf79413)
