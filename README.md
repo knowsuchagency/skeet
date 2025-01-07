@@ -1,6 +1,6 @@
 
 <h3 align="center">
-🎯 Skeet: The command-line AI copilot for power users.<br>A Swiss Army Knife for your terminal 🛠️
+🎯 Skeet: A local-friendly command-line AI copilot for Power Users 
 </h3> 
 
 ![skeet](https://github.com/user-attachments/assets/e4253aa6-3069-47bf-a7be-7da5bcf79413)
