@@ -613,16 +613,16 @@ wheels = [
 
 [[package]]
 name = "promptic"
-version = "4.0.1"
+version = "4.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jsonschema" },
     { name = "litellm" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6c/51/5b993b41c6542d4121d375225897a0ac36fb38d251e706f46e3bf0e969c8/promptic-4.0.1.tar.gz", hash = "sha256:78bb6535766a353ce12a28ea9b303730b0203472f0b0d1e366b66692e3b720f9", size = 99172 }
+sdist = { url = "https://files.pythonhosted.org/packages/df/2f/d780f850333e207f5c9e5fd603f818d47d39585c6c1dff92c8d8260da51f/promptic-4.1.0.tar.gz", hash = "sha256:53a0b8ebf463f72d00fa75fc862172e8214d9a9845eb39cf570dbed2d3cf357e", size = 100289 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/9c/2e035144895aee19ba9ae68af6956b9e060a01968f169ccafae98e0bbc8c/promptic-4.0.1-py3-none-any.whl", hash = "sha256:25024ac4b098e11cd9aa1fcc3c91f6fe74f7ac8f66fd9349ec7e4b9f1387e596", size = 15946 },
+    { url = "https://files.pythonhosted.org/packages/32/26/dcac98e9dde78247265b9179964791cb8c57f943f7e3cf9650bd44355723/promptic-4.1.0-py3-none-any.whl", hash = "sha256:b4746b809c337a3b7f2566d4a93a5bbc211740baa04ffde109d0fe958c201720", size = 16408 },
 ]
 
 [[package]]
@@ -1005,7 +1005,7 @@ wheels = [
 
 [[package]]
 name = "skeet"
-version = "2.1.0"
+version = "2.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -1017,7 +1017,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1.8" },
-    { name = "promptic", specifier = ">=4.0.1" },
+    { name = "promptic", specifier = ">=4.1.0" },
     { name = "rich", specifier = ">=13.9.4" },
     { name = "ruamel-yaml", specifier = ">=0.18.8" },
 ]

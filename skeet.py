@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from rich.prompt import Prompt
 from ruamel.yaml import YAML
 
-__version__ = "2.1.2"
+__version__ = "2.2.0"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
@@ -354,27 +354,23 @@ def main(
     )
     def get_or_analyze_command(
         query: str,
-        last_terminal_output: str = "",
         platform: str = platform.platform(),
         shell: str = get_shell_info(),
     ):
         """
-        Create or modify an appropriate terminal command or shell script based on the query, previous output, platform, and shell.
+        Create or modify an appropriate terminal command or shell script based on the query, platform, and shell.
 
         If the query is to be satisfied, the terminal command or shell script must return a zero exit code. For example, if the query is 'what is using port 8000', account for when the port is not being used like so: 'lsof -i :8000 || echo "port 8000 is not being used"'
 
         Do not include exposition or commentary.
 
         Query: '{query}'
-        Last Output: ```{last_terminal_output}```
         Platform: {platform}
         Shell: {shell}
         """
 
     verification_instructions = """
         Return the terminal command along with whether you have seen the last terminal output, the query was satisfied, and a message to the user.
-
-        If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
         If the query was satisfied and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
     """
 
@@ -386,33 +382,31 @@ def main(
             + f"Enclose the command in triple backticks with {get_shell_info()} as the shell."
         )
 
+    json_schema = Result.model_json_schema() if verify else None
+
     @llm(
         system=PYTHON_SYSTEM_PROMPT,
         memory=True,
         model=model,
         stream=not synchronous,
-        json_schema=Result.model_json_schema() if verify else None,
+        json_schema=json_schema,
         **litellm_kwargs,
     )
     def get_or_analyze_python_script(
         query: str,
-        last_terminal_output: str = "",
         platform: str = platform.platform(),
     ):
         """
-        Create or modify a Python script based on the query, previous output, and platform. Focus on the script -- avoid unnecessary exposition or commentary.
+        Create or modify a Python script based on the query and platform. Focus on the script -- avoid unnecessary exposition or commentary.
 
         If last_terminal_output is provided, analyze it for errors and make necessary corrections.
 
         Query: '{query}'
-        Last Output: ```{last_terminal_output}```
         Platform: {platform}
         """
 
     verification_instructions = """
         Return the script along with whether you have seen the last terminal output, the query was satisfied, and a message to the user.
-
-        If Last Output is empty, meaning there is nothing within the triple backticks, i_have_seen_the_last_terminal_output is False.
         If the query was satisfied and you have seen the last terminal output, the message_to_user should be a concise summary of the terminal output.
     """
 
@@ -432,6 +426,7 @@ def main(
     last_output = None
     iteration = 0
     return_code = -1
+    user_message = None
 
     while attempts < 0 or iteration < attempts:
         iteration += 1
@@ -442,16 +437,49 @@ def main(
         if return_code == 0 and not verify:
             return
 
-        def execute_llm() -> dict | str:
-            if python:
-                invocation = get_or_analyze_python_script(query_text, last_output)
-            else:
-                invocation = get_or_analyze_command(
-                    query_text if "sudo" not in query_text else "YOU CANNOT USE SUDO",
-                    last_output,
+        def execute_llm(
+            query_text=query_text,
+            user_message=user_message,
+            last_output=last_output,
+            json_schema=json_schema,
+        ) -> dict | str:
+            import json
+
+            method = get_or_analyze_python_script if python else get_or_analyze_command
+            sudo_in_query_in_command_mode = "sudo" in query_text and not python
+            query_text = (
+                query_text
+                if not sudo_in_query_in_command_mode
+                else "YOU CANNOT USE SUDO"
+            )
+            response_format = (
+                {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "Result",
+                        "schema": json_schema,
+                    },
+                }
+                if verify
+                else None
+            )
+
+            if user_message:
+                invocation = method.message(
+                    user_message, response_format=response_format
                 )
+                user_message = None
+            elif last_output:
+                invocation = method.message(
+                    f"Last Output: ```{last_output}```", response_format=response_format
+                )
+                last_output = None
+            else:
+                invocation = method(query_text)
 
             if synchronous:
+                if isinstance(invocation, str) and verify:
+                    invocation = json.loads(invocation)
                 return invocation
 
             result = ""
@@ -550,13 +578,12 @@ def main(
                 )
 
         if interactive:
-            changes = Prompt.ask(
+            user_message = Prompt.ask(
                 os.linesep
                 + "[magenta]What changes would you like to make? Hit [bold red]Enter[/] to run without changes.[/]",
                 default="",
             )
-            if changes:
-                query_text = changes
+            if user_message:
                 continue
 
         if python:
