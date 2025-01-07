@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from rich.prompt import Prompt
 from ruamel.yaml import YAML
 
-__version__ = "2.2.0"
+__version__ = "2.2.1"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
@@ -437,6 +437,19 @@ def main(
         if return_code == 0 and not verify:
             return
 
+        def postprocess_result(func):
+            """Postprocess the result of the LLM call."""
+            def wrapper(*args, **kwargs):
+                result: str | dict = func(*args, **kwargs)
+                if isinstance(result, dict):
+                    return result
+                else:
+                    # some models will incorrectly set the script language to toml
+                    return result.replace("```toml", "```python")
+
+            return wrapper
+
+        @postprocess_result
         def execute_llm(
             query_text=query_text,
             user_message=user_message,
