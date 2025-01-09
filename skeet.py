@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from rich.prompt import Prompt
 from ruamel.yaml import YAML
 
-__version__ = "2.2.3"
+__version__ = "2.2.4"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
@@ -257,8 +257,8 @@ def get_shell_info():
 @click.option(
     "--verbose",
     "-v",
-    is_flag=True,
-    help="If true, the program will print verbose output.",
+    count=True,
+    help="Increase verbosity level. Can be used multiple times (-v, -vv, -vvv).",
 )
 @click.option(
     "--synchronous",
@@ -283,7 +283,7 @@ def main(
     cleanup: bool,
     upgrade: bool,
     namespace: str,
-    verbose: bool,
+    verbose: int,
     synchronous: bool,
     python: bool,
 ):
@@ -328,6 +328,9 @@ def main(
                 "[yellow]Interactive mode is enabled. Settings attempts below zero to allow infinite attempts.[/yellow]"
             )
         attempts = -1
+
+    if verbose > 2:
+        os.environ["LITELLM_LOG"] = "DEBUG"
 
     if verbose:
         pprint(
@@ -431,7 +434,7 @@ def main(
     while attempts < 0 or iteration < attempts:
         iteration += 1
 
-        if verbose:
+        if verbose > 1:
             pprint({"iteration": iteration, "return_code": return_code})
 
         if return_code == 0 and not verify:
@@ -439,6 +442,7 @@ def main(
 
         def postprocess_result(func):
             """Postprocess the result of the LLM call."""
+
             def wrapper(*args, **kwargs):
                 result: str | dict = func(*args, **kwargs)
                 if isinstance(result, dict):
