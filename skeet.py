@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from rich.prompt import Prompt
 from ruamel.yaml import YAML
 
-__version__ = "2.2.4"
+__version__ = "2.2.5"
 
 DEFAULT_VALUES = {
     "model": "gpt-4o",
@@ -302,7 +302,7 @@ def main(
         ctx.exit()
 
     if namespace not in configurations:
-        raise ValueError(f"Namespace {namespace} not found in config.yaml")
+        raise SystemExit(f"Namespace '{namespace}' not found in config.yaml")
 
     config = configurations[namespace]
 
