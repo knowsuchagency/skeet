@@ -444,9 +444,13 @@ def main(
             """Postprocess the result of the LLM call."""
 
             def wrapper(*args, **kwargs):
-                result: str | dict = func(*args, **kwargs)
+                result = func(*args, **kwargs)
                 if isinstance(result, dict):
                     return result
+                elif hasattr(result, '__iter__') and not isinstance(result, (str, dict)):
+                    # Handle generator case by joining into string
+                    result = ''.join(str(x) for x in result)
+                    return result.replace("```toml", "```python")
                 else:
                     # some models will incorrectly set the script language to toml
                     return result.replace("```toml", "```python")
@@ -483,7 +487,8 @@ def main(
 
             if user_message:
                 invocation = method.message(
-                    user_message, response_format=response_format
+                    user_message,
+                    response_format=response_format,
                 )
                 user_message = None
             elif last_output:
