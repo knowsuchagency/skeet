@@ -71,7 +71,7 @@ google: # Google-specific configuration
   api_key: "sk-..."
 
 ollama: # Local Ollama configuration
-  model: "ollama_chat/phi3:medium"
+  model: "ollama_chat/phi4"
 ```
 
 You can specify which configuration to use with the `--namespace` or `-n` flag:
