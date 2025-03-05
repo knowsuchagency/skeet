@@ -5,7 +5,7 @@ requires = ["flit_core >=3.2,<4"]
 [project]
 dependencies = [
   "click>=8.1.8",
-  "promptic>=4.1.1",
+  "promptic>=4.1.2",
   "rich>=13.9.4",
   "ruamel-yaml>=0.18.8",
 ]
